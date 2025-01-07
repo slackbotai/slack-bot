@@ -26,7 +26,7 @@ A python based slack bot with various functionalities.
 
 ## Slack API
 
-1. Go to the URL `https://api.slack.com/apps`.
+1. Go to the URL `https://api.slack.com/apps` here: [API](https://api.slack.com/apps).
 
 2. Press the button `Create New App`.
 
@@ -36,92 +36,92 @@ A python based slack bot with various functionalities.
 
 5. You'll now be in the `Create app from manifest` section. Make sure `JSON` is selected and feel free to paste and use our manifest as printed below to save you some time and energy. Also feel free to change the name of the bot or any other personal preference/ description.
 
-    {
-        "display_information": {
-            "name": "slack-bot",
-            "description": "You can message me directly—no need to @ me! Tag channels with #channel for private summaries and keep the main channels clutter-free.",
-            "background_color": "#3D3D3D",
-            "long_description": "1. Summarisation\r\nGet summaries of any Slack channel for specific time periods, such as:\r\n\"Q2 this year\"\r\n\"Week 13 this year\"\r\n\"This month\"\r\n\"Around May this year\"\r\nTry it out and stay up-to-date effortlessly!\r\n\r\n2. Image Generation\r\nRequest the bot to create images based on your prompts. Let your imagination run wild!\r\n\r\n3. Web Search\r\nAsk the slack-bot to search the web for any information you need, directly from Slack.\r\n\r\n4. Agentic Report Writer\r\nUse the shortcut \"ai-create-report\". It will help you write a report about any subject and you work side by side giving each other the required information to accomplish the task.\r\n\r\nAdditional Features:\r\nYou can message the slack-bot directly to keep channels free from summarisation clutter, etc.\r\nUse /ai-bug-report to report issues you find!\r\nUse /ai-feature-request to suggest new features you'd like!\r\nUse /ai-enable-search to permit the bot to save and summarise chat history!\r\nUse /ai-disable-search to remove the bots permission to save and summarise chat history (default for private channels).\r\n\r\nStay productive and explore the bot's capabilities!"
+{
+    "display_information": {
+        "name": "slack-bot",
+        "description": "You can message me directly—no need to @ me! Tag channels with #channel for private summaries and keep the main channels clutter-free.",
+        "background_color": "#3D3D3D",
+        "long_description": "1. Summarisation\r\nGet summaries of any Slack channel for specific time periods, such as:\r\n\"Q2 this year\"\r\n\"Week 13 this year\"\r\n\"This month\"\r\n\"Around May this year\"\r\nTry it out and stay up-to-date effortlessly!\r\n\r\n2. Image Generation\r\nRequest the bot to create images based on your prompts. Let your imagination run wild!\r\n\r\n3. Web Search\r\nAsk the slack-bot to search the web for any information you need, directly from Slack.\r\n\r\n4. Agentic Report Writer\r\nUse the shortcut \"ai-create-report\". It will help you write a report about any subject and you work side by side giving each other the required information to accomplish the task.\r\n\r\nAdditional Features:\r\nYou can message the slack-bot directly to keep channels free from summarisation clutter, etc.\r\nUse /ai-bug-report to report issues you find!\r\nUse /ai-feature-request to suggest new features you'd like!\r\nUse /ai-enable-search to permit the bot to save and summarise chat history!\r\nUse /ai-disable-search to remove the bots permission to save and summarise chat history (default for private channels).\r\n\r\nStay productive and explore the bot's capabilities!"
+    },
+    "features": {
+        "bot_user": {
+            "display_name": "Slack Bot",
+            "always_online": true
         },
-        "features": {
-            "bot_user": {
-                "display_name": "Slack Bot",
-                "always_online": true
+        "shortcuts": [
+            {
+                "name": "ai-create-report",
+                "type": "global",
+                "callback_id": "create_report",
+                "description": "Start the Agentic Workflow of writing a document of your choice."
+            }
+        ],
+        "slash_commands": [
+            {
+                "command": "/ai-bug-report",
+                "description": "Give us your bug feedback!",
+                "usage_hint": "Bug when doing...",
+                "should_escape": false
             },
-            "shortcuts": [
-                {
-                    "name": "ai-create-report",
-                    "type": "global",
-                    "callback_id": "create_report",
-                    "description": "Start the Agentic Workflow of writing a document of your choice."
-                }
-            ],
-            "slash_commands": [
-                {
-                    "command": "/ai-bug-report",
-                    "description": "Give us your bug feedback!",
-                    "usage_hint": "Bug when doing...",
-                    "should_escape": false
-                },
-                {
-                    "command": "/ai-feature-request",
-                    "description": "What features do you want?",
-                    "usage_hint": "I would like...",
-                    "should_escape": false
-                },
-                {
-                    "command": "/ai-search-enable",
-                    "description": "Allow summarisation and chat history backup of the target channel",
-                    "should_escape": false
-                },
-                {
-                    "command": "/ai-search-disable",
-                    "description": "Disallow summarisation and chat history backup of the target channel",
-                    "should_escape": false
-                }
+            {
+                "command": "/ai-feature-request",
+                "description": "What features do you want?",
+                "usage_hint": "I would like...",
+                "should_escape": false
+            },
+            {
+                "command": "/ai-search-enable",
+                "description": "Allow summarisation and chat history backup of the target channel",
+                "should_escape": false
+            },
+            {
+                "command": "/ai-search-disable",
+                "description": "Disallow summarisation and chat history backup of the target channel",
+                "should_escape": false
+            }
+        ]
+    },
+    "oauth_config": {
+        "scopes": {
+            "bot": [
+                "channels:history",
+                "channels:read",
+                "chat:write",
+                "commands",
+                "files:read",
+                "files:write",
+                "groups:history",
+                "groups:read",
+                "im:history",
+                "im:read",
+                "im:write",
+                "links:read",
+                "reactions:read",
+                "reactions:write",
+                "team:read",
+                "users:read",
+                "links:write"
+            ]
+        }
+    },
+    "settings": {
+        "event_subscriptions": {
+            "bot_events": [
+                "message.channels",
+                "message.groups",
+                "message.im",
+                "reaction_added",
+                "reaction_removed"
             ]
         },
-        "oauth_config": {
-            "scopes": {
-                "bot": [
-                    "channels:history",
-                    "channels:read",
-                    "chat:write",
-                    "commands",
-                    "files:read",
-                    "files:write",
-                    "groups:history",
-                    "groups:read",
-                    "im:history",
-                    "im:read",
-                    "im:write",
-                    "links:read",
-                    "reactions:read",
-                    "reactions:write",
-                    "team:read",
-                    "users:read",
-                    "links:write"
-                ]
-            }
+        "interactivity": {
+            "is_enabled": true
         },
-        "settings": {
-            "event_subscriptions": {
-                "bot_events": [
-                    "message.channels",
-                    "message.groups",
-                    "message.im",
-                    "reaction_added",
-                    "reaction_removed"
-                ]
-            },
-            "interactivity": {
-                "is_enabled": true
-            },
-            "org_deploy_enabled": false,
-            "socket_mode_enabled": true,
-            "token_rotation_enabled": false
-        }
+        "org_deploy_enabled": false,
+        "socket_mode_enabled": true,
+        "token_rotation_enabled": false
     }
+}
 
 6. You'll now be at the confirmation stage `Review summary & create your app` Where you can have a quick look before you create the bot.
 
@@ -138,7 +138,7 @@ You can also set your bot's profile picture here if you want while you're at it.
 
 1. Clone the repository manually or use GitHub Desktop:
 
-    ```powershell
+    ```bash
     git clone https://github.com/slackbotai/slack-bot.git
     cd slack-bot
     ```
@@ -147,19 +147,19 @@ You can also set your bot's profile picture here if you want while you're at it.
 
     This and the next step are not required, but recommended if you plan on modifying the code and or the requirements.txt file. Else skip to step 4.
 
-    ```powershell
+    ```bash
     python -m venv venv
     ```
 
 3. Activate the virtual environment:
 
-    ```powershell
-    .\venv\Scripts\Activate.ps1
+    ```bash
+    ./venv/Scripts/activate
     ```
 
 4. Build the bot application with docker-compose:
 
-    ```powershell
+    ```bash
     docker-compose up --build
     ```
 
