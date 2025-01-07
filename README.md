@@ -165,9 +165,7 @@ You can also set your bot's profile picture here if you want while you're at it.
     docker-compose up --build
     ```
 
-    This will make sure you get the correct and compatible versions of python,
-    necessary requirements and MongoDB as required for the application. For
-    future restarts without any added changes, docker-compose up will suffice.
+    This will make sure you get the correct and compatible versions of python, requirements and MongoDB as required for the application. For future restarts without any added changes, docker-compose down then docker-compose up will suffice.
 
 ## How to Contribute
 
