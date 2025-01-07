@@ -13,7 +13,7 @@ A python based slack bot with various functionalities.
     *   `/ai-search-disable`: Using this command in a private channel disallows the bot from storing the channel history for RAG (Retrieval-Augmented Generation) using the summarisation feature.
     *   `/ai-bug-report`: Using this command adds a bug report visible to the bot admin(s) via the MongoDB compass.
     *   `/ai-feature-request`: Using this command adds a feature request visible to the bot admin(s) via the MongoDB compass.
-    **Shortcuts:**
+*   **Shortcuts:**
     * `ai-create-report`: Using this shortcut causes the bot to enter the create report stage where it will help you out in a thread until completion or if an inactivity timer is reached.
 *   **Event Handling:**
     *   Responds to `@mentions` in any chat it's a member of. Not required when talking to the bot in private messages.
