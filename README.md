@@ -19,22 +19,20 @@ A python based slack bot with various functionalities.
     *   Responds to `@mentions` in any chat it's a member of. Not required when talking to the bot in private messages.
 
 ## Prerequisites
-
 *   [Docker](https://www.docker.com/products/docker-desktop) installed and running.
 *   A Slack workspace where you have permissions to install apps.
-*   Create and fill in a `.env` file using the `.env.example` as a template. While the bot won't necessarily break because you're missing an API key is true in some cases, the functionalities will be limited. Some of the used API keys are accessible for free within limited usage.
+*   Create and fill in a `.env` file using the pre-existing `.env.example` file as a template. While the bot won't necessarily break because you're missing an API key is true in some cases, the functionalities will be limited. Some of the used API keys are accessible for free within limited usage and the Slack API keys will provided in the `Slack API` guide below.
 
 ## Slack API
-
-1. Go to the URL `https://api.slack.com/apps` here: [API](https://api.slack.com/apps).
+1. Go to the URL `https://api.slack.com/apps` or click here: [API](https://api.slack.com/apps).
 
 2. Press the button `Create New App`.
 
 3. Select `From a manifest`.
 
-4. Press `Select a workspace` and choose the workspace the slack-bot will be used for from the dropdown menu. Then press `Next`.
+4. Press `Select a workspace` and choose the workspace the slack-bot will be used for from the dropdown menu, then press `Next`.
 
-5. You'll now be in the `Create app from manifest` section. Make sure `JSON` is selected and feel free to paste and use our manifest as printed below to save you some time and energy. Also feel free to change the name of the bot or any other personal preference/ description.
+5. You'll now be in the `Create app from manifest` section. Make sure `JSON` is selected and feel free to paste and use our manifest as printed below to save you some time and energy. Also feel free to change the name of the bot or any other personal preference/ description. Once finished, proceed by pressing `Next`. 
 
     ```json
     {
@@ -125,20 +123,19 @@ A python based slack bot with various functionalities.
     }
     ```
 
-6. You'll now be at the confirmation stage `Review summary & create your app` Where you can have a quick look before you create the bot.
+6. You'll now be at the confirmation stage `Review summary & create your app` Where you can have a quick look before you create the bot by pressing `Create`.
 
-7. Great, now you've created your bot, but we're not done just yet, but almost! Under `Settings`, head to `Basic Information`, and under `App-Level Tokens` press `Generate Token and Scopes`. Paste the token name as `SLACK_BOT_TOKEN`, then press `Add Scope` and select the scope `connections:write` for it, then press `Generate`. When you've created it, make sure to save the API key and paste it in your `.env` file within the `SLACK_BOT_TOKEN` variable.
+7. Great, now you've created your bot, but we're not done just yet, but almost! Under `Settings`, head to `Basic Information`, and under `App-Level Tokens` press `Generate Token and Scopes`. Paste the token name as `SLACK_BOT_TOKEN`, then press `Add Scope` and select the scope `connections:write` for it, then press `Generate`. When you've generated it, make sure to copy the API key for example with the `Copy` button, then pressing `Done`. Paste the API key in your `.env` file within the `SLACK_BOT_TOKEN` variable.
 You can also set your bot's profile picture here if you want while you're at it.
 
 8. Now, under `Features`, press `App Home` and under `Show Tabs` tick the box for `Allow users to send Slash commands and messages from the messages tab`.
 
-9. Now it's time for our second and final Slack API key. We head back to `Settings` and press `Install App`. Press the button `Install to ai-bot`, continue by pressing `Allow`, then finally make sure to copy the `Bot User OAuth Token` API key and paste it into the `SLACK_BOT_TOKEN` variable in your `.env` file.
+9. Now it's time for our second and final Slack API key. We head back to `Settings` and press `Install App`. Press the button `Install to ai-bot`, continue by pressing `Allow`, then finally make sure to copy the `Bot User OAuth Token` API key with the `Copy` button and paste it into the `SLACK_BOT_TOKEN` variable in your `.env` file.
 
-10. Great! Your bot should now be configured properly with Slack. We just got to connect it with our source code!
+10. Great! Your bot should now be configured properly with Slack. We just got to connect it with our source code and the local database!
 
 ## Installation
-
-1. Clone the repository manually or use GitHub Desktop:
+1. Clone the repository manually or use GitHub Desktop then make sure that you are in the `slack-bot` code's current directory (cd) on your machine using a terminal:
 
     ```bash
     git clone https://github.com/slackbotai/slack-bot.git
@@ -165,14 +162,23 @@ You can also set your bot's profile picture here if you want while you're at it.
     docker-compose up --build
     ```
 
-    This will make sure you get the correct and compatible versions of python, requirements and MongoDB as required for the application. For future restarts without any added changes, docker-compose down then docker-compose up will suffice.
+    This will make sure you get the correct and compatible versions of python, requirements and MongoDB as required for the application. For future restarts without any added changes, `Left Control + C` in the terminal or using the Docker Desktop down followed by `docker-compose up` or using the Docker Desktop will suffice.
+
+    The code is set to re-run and download all new channels it can access every day at `00:00` (midnight). This can be done manually through a the process right above if you want it done asap.
+
+## MongoDB Compass
+While it's not necessary, we recommend using the MongoDB Compass for ease of access to see which channels are accessed for the summarisation, both public that the bot is invited to and private channels that it's A; invited to and B; allowed to summarise in through the slash command `ai-search-enable`. With the Compass you can also easily see user bug reports and feature requests.
+
+If it's something you wish to use, you can head to `https://www.mongodb.com/products/tools/compass` or click the link here: [Compass](https://www.mongodb.com/products/tools/compass).
+
+1. Once you have the compass up and running, press `Add new connection`. The `URI` should be `mongodb://localhost:27017` as well as in the `.env` file. For the name, that choice is up to you. Continue by pressing `Save & Connect`.
+
+2. And now you're done with that easy process! All downloaded channels are found in the `Channels` volume. All other information is found in the `Information` volume. There we have another `Channels` that is just further information about all channels accessed for summarisation. The `Summarisation` section includes all private channels that the bot is in and has access to via the `ai-search-enable` slash command. Here you will also find `ThreadStorage`, `URLStorage`, `BugReports` and `FeatureRequests` as the bot is used and there is data to store.
 
 ## How to Contribute
-
 Please follow the guidelines for contributing to this project.
 Please see our [Contributing Guidelines](HOW_TO_CONTRIBUTE.md) for details on
 how to get involved.
 
 ## License
-
 This project is licensed under the MIT License.
