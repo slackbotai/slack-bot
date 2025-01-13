@@ -1,7 +1,7 @@
 # slack-bot
 A python based slack bot with various functionalities.
 
-Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as your Slack Bot icon, or another one of your choice!
+Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as your Slack Bot icon, or another one of your choice!<br> 
 ![My project logo](docs/slackbot.png) 
 
 ## Features
