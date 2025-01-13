@@ -7,8 +7,8 @@ Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as
 ## Features
 *   **Main Features:**
     * Chat: Talk freely with the bot.
-    [![Chat Video](docs/slack_bot_chat_video.mp4)](docs/slack_bot_chat_video.mp4)
-    ![Chat GIF](docs/slack_bot_chat_gif.gif)
+    [![Chat Video](docs/slack_bot_chat.png)](docs/slack_bot_chat_video.mp4)
+    ![Chat GIF](docs/slack_bot_chat.gif)
     * Image Generation: Ask the bot to generate an image.
     * Web Search: Ask the bot to look up something for you.
     * Summarisation: Asking the model to summarise anything from company terms, what a user has said to a general summarisation of a given time frame in all tagged channels, as long as the bot has access to them. The bot has default access to all public channels it has been invited to. Private channels requires an extra slash command as a privacy measure.
