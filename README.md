@@ -24,7 +24,6 @@ Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as
 
     * Create a report: The bot can help you create a report or at least the rough edges of one by using an agentic workflow between the user and the agents to achieve a result.<br> 
     ![Chat GIF](docs/report_gif.gif)
-    Prompt: 
 *   **Slash Commands:**
     *   `/ai-search-enable`: Using this command in a private channel allows the bot to store the channel history for RAG (Retrieval-Augmented Generation) using the summarisation feature.
     *   `/ai-search-disable`: Using this command in a private channel disallows the bot from storing the channel history for RAG (Retrieval-Augmented Generation) using the summarisation feature.
