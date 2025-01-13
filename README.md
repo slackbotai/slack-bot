@@ -6,19 +6,23 @@ Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as
 
 ## Features
 *   **Main Features:**
-    * Chat: Talk freely with the bot.
-    ![Chat GIF](docs/chat_gif.gif)
+    * Chat: Talk freely with the bot.<br> 
+    ![Chat GIF](docs/chat_gif.gif)<br> 
     Prompt: `Tell me three facts about Greenland!`
-    * Image Generation: Ask the bot to generate an image.
-    ![Chat GIF](docs/image_gif.gif)
+
+    * Image Generation: Ask the bot to generate an image.<br> 
+    ![Chat GIF](docs/image_gif.gif)<br> 
     Prompt: `Make an image of something typically Greenlandic`
-    * Web Search: Ask the bot to look something up for you.
-    ![Chat GIF](docs/search_gif.gif)
+
+    * Web Search: Ask the bot to look something up for you.<br> 
+    ![Chat GIF](docs/search_gif.gif)<br> 
     Prompt: `Can you look up what the population of Greenland is?`
-    * Summarisation: Asking the model to summarise anything from company terms, what a user has said to a general summarisation of a given time frame in all tagged channels, as long as the bot has access to them. The bot has default access to all public channels it has been invited to. Private channels requires an extra slash command as a privacy measure.
-    ![Chat GIF](docs/summary_gif.gif)
+
+    * Summarisation: Asking the model to summarise anything from company terms, what a user has said to a general summarisation of a given time frame in all tagged channels, as long as the bot has access to them. The bot has default access to all public channels it has been invited to. Private channels requires an extra slash command as a privacy measure.<br> 
+    ![Chat GIF](docs/summary_gif.gif)<br> 
     Prompt: `Summarise this week #channel`
-    * Create a report: The bot can help you create a report or at least the rough edges of one by using an agentic workflow between the user and the agents to achieve a result.
+
+    * Create a report: The bot can help you create a report or at least the rough edges of one by using an agentic workflow between the user and the agents to achieve a result.<br> 
     ![Chat GIF](docs/report_gif.gif)
     Prompt: 
 *   **Slash Commands:**
