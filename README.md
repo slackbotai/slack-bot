@@ -7,23 +7,24 @@ Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as
 ## Features
 *   **Main Features:**
     * Chat: Talk freely with the bot.<br> 
-    ![Chat GIF](docs/chat_gif.gif)<br> 
-    Prompt: `Tell me three facts about Greenland!`
+    ![Chat Screenshot](docs/chat.png)<br> 
+    Prompt: `Can you tell me your favourite Greenland fact?`
 
     * Image Generation: Ask the bot to generate an image.<br> 
-    ![Chat GIF](docs/image_gif.gif)<br> 
-    Prompt: `Make an image of something typically Greenlandic`
+    ![Image Screenshot](docs/image_gen.png)<br> 
+    Prompt: `Can you generate an image which is very typically Greenlandic?`
 
     * Web Search: Ask the bot to look something up for you.<br> 
-    ![Chat GIF](docs/search_gif.gif)<br> 
-    Prompt: `Can you look up what the population of Greenland is?`
+    ![Search Screenshot](docs/search.png)<br> 
+    Prompt: `Can you look up the population of Greenland?`
 
     * Summarisation: Asking the model to summarise anything from company terms, what a user has said to a general summarisation of a given time frame in all tagged channels, as long as the bot has access to them. The bot has default access to all public channels it has been invited to. Private channels requires an extra slash command as a privacy measure.<br> 
-    ![Chat GIF](docs/summary_gif.gif)<br> 
-    Prompt: `Summarise this week #channel`
+    ![Summarisation Screenshot](docs/summarisation.png)<br> 
+    Prompt: `Summarise the past week #channel`
 
-    * Create a report: The bot can help you create a report or at least the rough edges of one by using an agentic workflow between the user and the agents to achieve a result.<br> 
-    ![Chat GIF](docs/report_gif.gif)
+    * Create a report: The bot can help you create a report or at least the concept of one by using an agentic workflow between the user and the agents to achieve a result.<br> 
+    ![Report Screenshot](docs/report.png)<br>
+    Shortcut: `ai-create-report`
 *   **Slash Commands:**
     *   `/ai-search-enable`: Using this command in a private channel allows the bot to store the channel history for RAG (Retrieval-Augmented Generation) using the summarisation feature.
     *   `/ai-search-disable`: Using this command in a private channel disallows the bot from storing the channel history for RAG (Retrieval-Augmented Generation) using the summarisation feature.
