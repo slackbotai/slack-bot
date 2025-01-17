@@ -6,23 +6,23 @@ Meet Slack Bot. This is just our default (ominous) image. Feel free to use it as
 
 ## Features
 *   **Main Features:**
-    * Chat: Talk freely with the bot.<br> 
+    * **Chat**: Talk freely with the bot.<br> 
     ![Chat Screenshot](docs/chat.png)<br> 
     Prompt: `Can you tell me your favourite Greenland fact?`
 
-    * Image Generation: Ask the bot to generate an image.<br> 
+    * **Image Generation**: Ask the bot to generate an image.<br> 
     ![Image Screenshot](docs/image_gen.png)<br> 
     Prompt: `Can you generate an image which is very typically Greenlandic?`
 
-    * Web Search: Ask the bot to look something up for you.<br> 
+    * **Web Search**: Ask the bot to look something up for you.<br> 
     ![Search Screenshot](docs/search.png)<br> 
     Prompt: `Can you look up the population of Greenland?`
 
-    * Summarisation: Asking the model to summarise anything from company terms, what a user has said to a general summarisation of a given time frame in all tagged channels, as long as the bot has access to them. The bot has default access to all public channels it has been invited to. Private channels requires an extra slash command as a privacy measure.<br> 
+    * **Summarisation**: Asking the model to summarise anything from company terms, what a user has said to a general summarisation of a given time frame in all tagged channels, as long as the bot has access to them. The bot has default access to all public channels it has been invited to. Private channels requires an extra slash command as a privacy measure.<br> 
     ![Summarisation Screenshot](docs/summarisation.png)<br> 
     Prompt: `Summarise the past week #channel`
 
-    * Create a report: The bot can help you create a report or at least the concept of one by using an agentic workflow between the user and the agents to achieve a result.<br> 
+    * **Create a report**: The bot can help you create a report or at least the concept of one by using an agentic workflow between the user and the agents to achieve a result.<br> 
     ![Report Screenshot](docs/report.png)<br>
     Shortcut: `ai-create-report`
 *   **Slash Commands:**
