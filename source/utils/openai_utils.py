@@ -52,6 +52,7 @@ def structured_output(
         messages:list,
         structured_class:object,
         model:str="gpt-4o-mini",
+        max_completion_tokens:int=None,
 ) -> object:
     """
     Call the OpenAI API to generate a structured output from
@@ -74,7 +75,8 @@ def structured_output(
     response = aiclient.beta.chat.completions.parse(
         model=model,
         messages=messages,
-        response_format=structured_class
+        response_format=structured_class,
+        max_completion_tokens=max_completion_tokens
     )
     response = response.choices[0].message.parsed
     return response

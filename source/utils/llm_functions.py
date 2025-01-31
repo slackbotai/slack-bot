@@ -210,7 +210,11 @@ def classify_user_request(
         slack_bot_user_id,
         system_prompt
     )
-    response = structured_output(formatted_text[-10:], FunctionResponse)
+    response = structured_output(
+        formatted_text[-10:],
+        FunctionResponse,
+        max_completion_tokens=15
+    )
     return response.function
 
 

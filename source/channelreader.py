@@ -50,6 +50,7 @@ from collections import OrderedDict
 
 # Third-party library imports
 import schedule
+from slack_sdk.errors import SlackApiError
 
 # Application-specific imports
 from utils.slack_utils import get_member_name
@@ -712,17 +713,26 @@ async def fetch_channel_page(client: object, cursor=None) -> dict:
     Returns:
         dict: A dictionary containing the response data.
     """
-    try:
-        response = await asyncio.to_thread(
-            client.conversations_list,
-            types="public_channel,private_channel",
-            cursor=cursor,
-            limit=100,
-        )
-        return response
-    except Exception as e:
-        log_error(e, "Error fetching channel page.")
-        return {}
+    while True:
+        try:
+            response = await asyncio.to_thread(
+                client.conversations_list,
+                types="public_channel,private_channel",
+                cursor=cursor,
+                limit=100,
+            )
+            return response
+        except SlackApiError as e:
+            if e.response.get("error") == "ratelimited":
+                log_message("Slack API ratelimited", "warning")
+                await asyncio.sleep(5)
+                continue
+            else:
+                log_error(e, "Error fetching channel page.")
+                return {}
+        except Exception as e:
+            log_error(e, "Error fetching channel page.")
+            return {}
 
 
 def process_channel_cleanup(
