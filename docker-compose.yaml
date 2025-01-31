@@ -1,0 +1,35 @@
+services:
+  slack_bot:
+    build:
+      context: . # Build context is the current directory
+      dockerfile: Dockerfile
+    container_name: slack_bot
+    environment:
+      - IS_DOCKER=true  # Indicates the app is running inside Docker
+      - MONGO_URI_DOCKER=mongodb://host.docker.internal:27017/  # MongoDB connection URI for Docker
+      - MONGO_URI=mongodb://mongo:27017/
+      - OPENAI_API_KEY=${OPENAI_API_KEY}  # OpenAI API key
+      - SERPER_API_KEY=${SERPER_API_KEY}  # Serper API key
+      - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}  # Slack app token
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN}  # Slack bot token
+      - GEMINI_API_KEY=${GEMINI_API_KEY}  # Gemini API key
+      - LANGCHAIN_TRACING_V2=${LANGCHAIN_TRACING_V2}
+      - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT}
+      - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
+      - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}
+    ports:
+      - "5000:5000"  # Expose port 5000 (adjust as needed)
+    depends_on:
+      - mongo  # Wait for mongo container to be ready
+  mongo:
+    image: mongodb/mongodb-community-server:7.0.0-rc10-ubi8
+    container_name: mongodb
+    ports:
+      - "27017:27017"  # Expose MongoDB port 27017
+    volumes:
+      - mongo_data:/data/db  # Persist MongoDB data
+      - ./empty_configdb:/data/configdb  # Bind mount an empty directory to avoid anonymous empty volume creation
+
+volumes:
+  mongo_data:
+    driver: local

@@ -1,0 +1,260 @@
+"""
+message_utils.py
+
+This module contains utility functions for processing Slack messages
+and extracting relevant information from them.
+
+Functions:
+- is_relevant_message: Determine if the message event is relevant for
+    further processing.
+- extract_event_data: Extract essential data fields from a Slack event.
+- is_direct_message: Check if the message is a direct message to the bot
+    or mentions the bot.
+- log_user_info: Log user information for debugging purposes.
+- preprocess_user_input: Clean and prepare the user's input message and
+    timestamp for processing.
+- add_reaction: Add a specified reaction emoji to a message.
+- remove_reaction: Remove a specified reaction emoji from a message.
+- post_ephemeral_message_ok: Post an ephemeral message to the user.
+
+Attributes:
+    CHANNEL_PATTERN: A regular expression pattern for matching channel
+        mentions in messages.
+    slack_bot_user_id: The user ID of the Slack bot.
+"""
+
+import re
+
+from slack_sdk.errors import SlackApiError
+
+from envbase import slack_bot_user_id
+
+CHANNEL_PATTERN = re.compile(r"<#([A-Z0-9]+)\|([a-z0-9_åäö\-]*)>")
+
+def is_relevant_message(event: dict,) -> bool:
+    """
+    Determine if the message event is relevant for further processing.
+    
+    Args:
+        event (dict): The Slack event data.
+        
+    Returns:
+        bool: True if the message is relevant, otherwise False.
+    """
+    subtype = event.get("subtype")
+    return subtype not in {"bot_message", "message_changed", "message_deleted"}
+
+
+def extract_event_data(event: dict,) -> dict:
+    """
+    Extract essential data fields from a Slack event.
+    
+    Args:
+        event (dict): The Slack event data.
+        
+    Returns:
+        dict: A dictionary with extracted fields, such as 
+        'user_input', 'event_ts', 'thread_ts', 'channel_id',
+        and 'user_id'.
+    """
+    return {
+        "user_input": event.get("text", "").strip(),
+        "event_ts": event.get("ts"),
+        "thread_ts": event.get("thread_ts"),
+        "channel_id": event.get("channel"),
+        "user_id": event.get("user"),
+        "files": event.get("files", []),
+    }
+
+
+def is_direct_message(
+        client: object,
+        user_input: str,
+        user_id: str,
+        channel_id: str,
+) -> bool:
+    """
+    Check if the message is a direct message to the bot or
+    mentions the bot.
+
+    Args:
+        client (object): The Slack client instance.
+        user_input (str): The content of the message.
+        user_id (str): The Slack user ID of the message sender.
+        channel_id (str): The Slack channel ID where the
+            message was sent.
+
+    Returns:
+        bool: True if the message is a direct message to the
+            bot or mentions the bot.
+    
+    Raises:
+        Exception: If an error occurs while checking the message.
+    """
+    try:
+        # Ignore messages from the bot itself
+        if user_id == slack_bot_user_id:
+            return False
+
+        # Check if the message is from a DM or if it mentions the bot
+        im_channel_id = client.conversations_open(
+            users=[user_id]
+            )["channel"]["id"]
+        enable_dm_mode = channel_id == im_channel_id
+        mentions_bot = user_input.startswith(f"<@{slack_bot_user_id}>")
+        return bool(user_input) and (mentions_bot or enable_dm_mode)
+    except SlackApiError as e:
+        if e.response["error"] == "cannot_dm_bot":
+            return False
+
+
+def log_user_info(
+        client: object,
+        user_id: str,
+) -> None:
+    """
+    Log user information for debugging purposes.
+    
+    Args:
+        client (object): The Slack client instance.
+        user_id (str): The Slack user ID.
+        
+    Returns:
+        None
+    """
+    user_info = client.users_info(user=user_id).get('user').get('profile')
+    # log_message(
+    #     f"user_id = {user_id}, "
+    #     f"user_name = {user_info.get('real_name_normalized')}, "
+    #     f"user_email = {user_info.get('email')}",
+    #     level="debug"
+    # )
+
+
+def preprocess_user_input(
+        user_input: str,
+        event_ts: str,
+        thread_ts: str,
+) -> tuple:
+    """
+    Clean and prepare the user's input message and timestamp
+    for processing.
+
+    Args:
+        user_input (str): The user's original input message.
+        event_ts (str): The event timestamp.
+        thread_ts (str): The thread timestamp, if available.
+
+    Returns:
+        tuple: A tuple containing the cleaned input message and
+            the effective thread timestamp.
+    """
+    # Remove bot's mention from the input
+    cleaned_input = user_input.replace(f"<@{slack_bot_user_id}>", "", 1)
+    # Use event timestamp as thread timestamp if not provided
+    if thread_ts is None:
+        thread_ts = event_ts
+    return cleaned_input, thread_ts
+
+
+def add_reaction(
+        client: object,
+        channel_id: str,
+        timestamp: str,
+        reaction_name: str,
+) -> None:
+    """
+    Add a specified reaction emoji to a message.
+    
+    Args:
+        client (object): The Slack client instance.
+        channel_id (str): The channel ID where the message is located.
+        timestamp (str): The message timestamp.
+        reaction_name (str): The name of the reaction emoji.
+        
+    Returns:
+        None
+    """
+    client.reactions_add(
+        channel=channel_id,
+        timestamp=timestamp,
+        name=reaction_name
+    )
+
+
+def remove_reaction(
+        client: object,
+        channel_id: str,
+        timestamp: str,
+        reaction_name: str,
+) -> None:
+    """
+    Remove a specified reaction emoji from a message.
+    
+    Args:
+        client (object): The Slack client instance.
+        channel_id (str): The channel ID where the message is located.
+        timestamp (str): The message timestamp.
+        reaction_name (str): The name of the reaction emoji.
+        
+    Returns:
+        None
+    """
+    client.reactions_remove(
+        channel=channel_id,
+        timestamp=timestamp,
+        name=reaction_name
+    )
+
+
+def post_ephemeral_message_ok(
+        client:object,
+        channel_id:str,
+        user_id:str,
+        thread_ts:str,
+        text:str,
+) -> None:
+    """
+    Post an ephemeral message to the user.
+
+    Post an ephemeral message to the user in a thread with the
+    specified text. Underneath the text, an "OK" button is displayed
+    for the user to acknowledge. If the user clicks the button,
+    the message will be dismissed.
+    
+    Args:
+        client (object): The Slack client instance.
+        channel_id (str): The channel ID where the message is located.
+        user_id (str): The user ID to send the message to.
+        thread_ts (str): The timestamp of the thread where the
+            message is located.
+        text (str): The text content of the message.
+        
+    Returns:
+        None
+    """
+    client.chat_postEphemeral(
+        channel=channel_id,
+        user=user_id,
+        thread_ts=thread_ts,
+        blocks=[
+            {
+                "type": "section",
+                "text": {
+                    "type": "mrkdwn",
+                    "text": text,
+                },
+            },
+            {
+                "type": "actions",
+                "elements": [
+                    {
+                        "type": "button",
+                        "text": {"type": "plain_text", "text": "OK"},
+                        "action_id": "acknowledge_summary_warning",
+                    }
+                ],
+            },
+        ],
+        text=text,
+    )

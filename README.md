@@ -192,6 +192,16 @@ If it's something you wish to use, you can head to `https://www.mongodb.com/prod
 
 2. And now you're done with that easy process! All downloaded channels are found in the `Channels` volume. All other information is found in the `Information` volume. There we have another `Channels` that is just further information about all channels accessed for summarisation. The `Summarisation` section includes all private channels that the bot is in and has access to via the `ai-search-enable` slash command. Here you will also find `ThreadStorage`, `URLStorage`, `BugReports` and `FeatureRequests` as the bot is used and there is data to store.
 
+## pip-tools
+We're using the pip-tools workflow to stay updated within the team, and you or your team can, too. In order to use it, we've included it as an install in the dockerfile, so you will already have access to it on installation. As you can see, except the normal `requirements.txt` file, there is an additional `requirements.in` file. This file is where you place what pip installs you want to use. I'll explain the workflow:
+1. Add the desired package to the .in file, e.g. `openai` for the latest version, or `openai==version-here` with your version of choice.
+
+2. Then, use the command `pip-compile requirements.in` in your for example VSC powershell terminal which updates your `requirements.txt` file accordingly.
+
+3. Now, you can either use the command `pip-sync` in the same terminal to update your `venv`, or you can run a new `docker-compose up --build`.
+
+4. What about if you ever want to updates packages in the future? You can either empty the `requirements.txt` file and run a new `pip-compile requirements.in` then a `pip-sync` command, or you can run `pip-compile requirements.in --upgrade-package openai` to update an individual package, then run the steps above again; `pip-compile requirements.in` then `pip-sync`. That's all you need to know to use this workflow!
+
 ## How to Contribute
 Please follow the guidelines for contributing to this project.
 Please see our [Contributing Guidelines](HOW_TO_CONTRIBUTE.md) for details on
