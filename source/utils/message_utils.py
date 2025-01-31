@@ -108,29 +108,6 @@ def is_direct_message(
             return False
 
 
-def log_user_info(
-        client: object,
-        user_id: str,
-) -> None:
-    """
-    Log user information for debugging purposes.
-    
-    Args:
-        client (object): The Slack client instance.
-        user_id (str): The Slack user ID.
-        
-    Returns:
-        None
-    """
-    user_info = client.users_info(user=user_id).get('user').get('profile')
-    # log_message(
-    #     f"user_id = {user_id}, "
-    #     f"user_name = {user_info.get('real_name_normalized')}, "
-    #     f"user_email = {user_info.get('email')}",
-    #     level="debug"
-    # )
-
-
 def preprocess_user_input(
         user_input: str,
         event_ts: str,

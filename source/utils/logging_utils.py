@@ -1,12 +1,14 @@
 """
-This module provides utilities for handling errors and logging in a Slack 
-integration. It includes functionalities to log errors to MongoDB, handle 
-Slack message reactions, and communicate errors to users via OpenAI responses.
+This module provides utilities for handling errors and logging in a
+Slack integration. It includes functionalities to log errors to MongoDB,
+handle Slack message reactions, and communicate errors to users via
+OpenAI responses.
 
 Functions:
 - log_error: Log error details to MongoDB.
 - log_message: Log messages to MongoDB.
-- error_handler: Handle errors by reacting, sending an error message, and logging.
+- error_handler: Handle errors by reacting, sending an error message,
+    and logging.
 """
 
 import logging
@@ -14,7 +16,7 @@ import time
 import traceback
 from datetime import datetime
 
-from envbase import logging as mongo_logging  # Import the MongoDB collection
+from envbase import logging as mongo_logging
 from utils.message_utils import add_reaction, remove_reaction
 from utils.openai_utils import openai_request
 from prompts.prompts import error_message_prompt
@@ -24,7 +26,7 @@ logger = logging.getLogger("slackbot")
 logger.setLevel(logging.INFO)  # Set the overall logging level
 
 console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)  # Log all messages to the console
+console_handler.setLevel(logging.INFO)  # Log all messages to console
 
 # Define a logging format
 formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
@@ -178,6 +180,7 @@ def error_handler(
             text=f"{completion.choices[0].message.content}"
         )
     except Exception as openai_error:
-        log_error(openai_error, "Error during OpenAI request or sending message")
-
+        log_error(
+            openai_error, "Error during OpenAI request or sending message"
+        )
     return

@@ -21,7 +21,7 @@ Functions:
     with new or updated messages.
 - execute_bulk_operations: Execute MongoDB bulk operations.
 - update_existing_threads: Update existing threads by fetching new
-    replies for root messages within a cutoff period.
+    replies for root messages within a cut-off period.
 - cleanup_missing_messages: Synchronise MongoDB with Slack data by
     removing missing root and thread messages.
 
@@ -482,7 +482,7 @@ def update_existing_threads(
 ) -> None:
     """
     Updates existing threads by fetching new replies for root messages
-    within a cutoff period.
+    within a cut-off period.
 
     Args:
         client (object):
@@ -497,7 +497,7 @@ def update_existing_threads(
     # Get the MongoDB collection for the channel
     collection = mongodb[channel_id]
 
-    # Calculate the cutoff timestamp
+    # Calculate the cut-off timestamp
     cutoff_datetime = datetime.now() - timedelta(days=days_ago)
     cutoff_timestamp = cutoff_datetime.timestamp()
 
@@ -584,7 +584,7 @@ def cleanup_missing_messages(
     2. Removes placeholder root messages ("This message was deleted.")
        while retaining associated thread messages.
     3. Deletes root messages from MongoDB that no longer exist in Slack
-       within the specified cutoff date.
+       within the specified cut-off date.
     4. Verifies and removes thread messages in MongoDB that no longer
        exist in Slack.
 

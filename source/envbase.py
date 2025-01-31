@@ -78,9 +78,9 @@ is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 
 # Use 'mongo' for Docker, 'localhost' for local development
 if is_docker:
-    mongo_uri = "mongodb://host.docker.internal:27017/"
+    MONGO_URI = "mongodb://host.docker.internal:27017/"
 else:
-    mongo_uri = "mongodb://localhost:27017/"
+    MONGO_URI = "mongodb://localhost:27017/"
 
 serper_api_key = os.getenv("SERPER_API_KEY")
 
@@ -90,7 +90,7 @@ slackapp = App(token=slack_bot_token)
 aiclient = OpenAI(api_key=openai_api_key)
 genai.configure(api_key=gemini_api_key)
 gemclient = genai
-mongo_client = MongoClient(mongo_uri)
+mongo_client = MongoClient(MONGO_URI)
 
 # Channels DB
 mongodb = mongo_client["Channels"]

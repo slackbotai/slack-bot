@@ -145,7 +145,7 @@ async def get_conversations_history_async(
 
         except SlackApiError as e:
             # Handle Slack API-specific errors and retry
-            log_error(e, f"Slack API Error.")
+            log_error(e, "Slack API Error.")
             log_message(f"Retrying in {5} seconds...", "info")
             retries += 1
             time.sleep(5) # Wait before retrying
@@ -433,14 +433,14 @@ def get_channel_name(client: object, channel_id: str) -> str:
         response = client.conversations_info(channel=channel_id)
         return response["channel"]["name"]
 
-    except SlackApiError as e:
+    except SlackApiError:
         log_message(
             "Slack API Error retrieving channel name.",
             "error"
         )
         raise
 
-    except Exception as e:
+    except Exception:
         log_message(
             "Unexpected error retrieving channel name.",
             "error"

@@ -43,11 +43,11 @@ from io import BytesIO
 
 import docx
 import requests
-import pandas as pd
-from PIL import Image
+import pandas as pd # pylint: disable=import-error
+from PIL import Image # pylint: disable=import-error
 from tiktoken import encoding_for_model
-from pdfminer.high_level import extract_text
-from pillow_heif import register_heif_opener
+from pdfminer.high_level import extract_text # pylint: disable=import-error
+from pillow_heif import register_heif_opener # pylint: disable=import-error
 
 from prompts.prompts import image_analyse_prompt, gemini_pdf_summary
 from utils.gemini_utils import gemini_request

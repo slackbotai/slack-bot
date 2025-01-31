@@ -47,7 +47,7 @@ def gemini_request(
     # Call the Gemini API to generate content
     response = model.generate_content(
         text,
-        generation_config=generation_config, 
+        generation_config=generation_config,
         stream=stream
     )
     # Return the generated text response

@@ -98,11 +98,11 @@ def channel_member_verification(
                     f"{tagged_channel_id} (after checking all pages).",
                     "debug"
                 )
-        except SlackApiError as e:
+        except SlackApiError:
             raise SlackApiError(
                 f"Error fetching members of channel <#{tagged_channel_id}|>."
             )
-        
+
         except PermissionError:
             raise
 

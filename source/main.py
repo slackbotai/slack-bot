@@ -35,7 +35,7 @@ from slackapp_commands import (
     search_disable,
     create_report
 )
-from utils.logging_utils import log_error, log_message
+from utils.logging_utils import log_message
 
 def main(retry=3,) -> None:
     """
@@ -75,7 +75,8 @@ def main(retry=3,) -> None:
         except (SlackApiError, IncompleteRead):
             retry -= 1
             log_message(
-                f"Failed to connect to Slack. Retrying... {retry} retries left.",
+                f"Failed to connect to Slack. "
+                f"Retrying... {retry} retries left.",
                 "warning"
             )
             time.sleep(2)  # Short delay before retrying
@@ -84,7 +85,8 @@ def main(retry=3,) -> None:
             break
     else:
         # All retries failed
-        log_message("Failed to connect to Slack after multiple retries.", "critical")
-
+        log_message(
+            "Failed to connect to Slack after multiple retries.", "critical"
+        )
 if __name__ == "__main__":
     main()

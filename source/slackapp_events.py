@@ -21,16 +21,14 @@ Attributes:
     styler (Markdown2Slack): An instance of the Markdown to Slack
         converter for formatting messages.
 """
-from openai import BadRequestError
 
 from envbase import slackapp, slack_bot_user_id
-from utils.llm_functions import classify_user_request, interpret_summary_bool
 from event_calls.image_gen import handle_image_generation
 from event_calls.text_gen import handle_text_processing
 from event_calls.web_search import web_browser
 from event_calls.summarisation import handle_summarise_request
-#from event_calls.copy_summarisation import handle_summarise_request
 from agentic_workflow.threads_data import active_threads
+from utils.llm_functions import classify_user_request, interpret_summary_bool
 from utils.slack_markdown_converter import Markdown2Slack
 from utils.logging_utils import error_handler, log_error
 from utils.message_utils import (
@@ -39,11 +37,8 @@ from utils.message_utils import (
     is_direct_message,
     preprocess_user_input,
     add_reaction,
-    remove_reaction,
-    log_user_info,
     post_ephemeral_message_ok
 )
-
 styler = Markdown2Slack()
 
 @slackapp.event("reaction_added")
@@ -116,8 +111,8 @@ def message(
         Exception: Raised for any other errors that occur during the message
             handling process.
     """
+    error_context = "Error: Message handling"
     try:
-        error_context = "Error: Message handling"
         ack()
 
         data = args.__dict__
@@ -157,7 +152,7 @@ def message(
                 slack_bot_user_id,
                 user_input
             )
-            
+
             if completion != "llm-query":
                 # Interpret if a summary is requested
                 try:
@@ -179,7 +174,7 @@ def message(
                         )
                 except Exception as e:
                     log_error(e, context="Error: Interpret summary bool")
-                    
+
             if "llm-chat" in completion:
                 error_context = "Error: Text processing"
                 handle_text_processing(
@@ -190,7 +185,7 @@ def message(
                     channel_id,
                     user_id
                 )
-                    
+
             elif "llm-browse" in completion and not files:
                 error_context = "Error: Web browsing"
                 web_browser(
@@ -222,7 +217,7 @@ def message(
                     user_id,
                     say
                 )
-                
+
     except Exception as e:
         error_handler(
             e, client, channel_id, say, thread_ts,

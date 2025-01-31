@@ -53,13 +53,13 @@ import schedule
 from slack_sdk.errors import SlackApiError
 
 # Application-specific imports
-from utils.slack_utils import get_member_name
 from envbase import (
     slack_web_client,
     mongodb,
     summarisation,
     channels
 )
+from utils.slack_utils import get_member_name
 from utils.mongodb_utils import (
     save_messages_to_mongodb,
     cleanup_missing_messages,
@@ -669,7 +669,7 @@ async def fetch_all_channel_ids_async(client: object) -> list[tuple[str, str]]:
                 f"{channel_name} (ID: {channel_id})",
                 'info'
             )
-        log_message(    
+        log_message(
             "Private Channels:",
             'info'
         )

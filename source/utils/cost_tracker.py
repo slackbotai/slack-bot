@@ -17,10 +17,10 @@ Attributes:
         models based on input and output token usage.
 """
 import os
-import pandas as pd
+import pandas as pd # pylint: disable=import-error
 
-import matplotlib
-import matplotlib.pyplot as plt
+import matplotlib # pylint: disable=import-error
+import matplotlib.pyplot as plt # pylint: disable=import-error
 
 from utils.logging_utils import log_error, log_message
 

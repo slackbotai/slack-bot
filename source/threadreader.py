@@ -28,8 +28,8 @@ Attributes:
 
 import asyncio
 from datareader import datareader
-from utils.web_reader import process_urls_async
 from envbase import slack_bot_token
+from utils.web_reader import process_urls_async
 from utils.slack_utils import get_member_name
 
 

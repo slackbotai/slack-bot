@@ -29,11 +29,11 @@ import asyncio
 import tempfile
 import datetime
 
-import pypandoc
+import pypandoc # pylint: disable=import-error
 import requests
-import pdfplumber
+import pdfplumber # pylint: disable=import-error
 import playwright._impl._errors
-from html_sanitizer import Sanitizer
+from html_sanitizer import Sanitizer # pylint: disable=import-error
 from bs4 import BeautifulSoup, Comment
 from playwright.async_api import async_playwright
 
