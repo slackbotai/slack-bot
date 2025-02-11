@@ -11,12 +11,13 @@ Functions:
     and logging.
 """
 
+from datetime import datetime
 import logging
 import time
 import traceback
-from datetime import datetime
+import pytz
 
-from envbase import logging as mongo_logging
+from envbase import logging as mongo_logging, timezone
 from utils.message_utils import add_reaction, remove_reaction
 from utils.openai_utils import openai_request
 from prompts.prompts import error_message_prompt
@@ -28,8 +29,32 @@ logger.setLevel(logging.INFO)  # Set the overall logging level
 console_handler = logging.StreamHandler()
 console_handler.setLevel(logging.INFO)  # Log all messages to console
 
+# Making sure envbase.timezone is defined, otherwise use a default
+if timezone is None:  # Add this check
+    timezone = pytz.utc
+    print("WARNING: envbase.timezone is not set. Using UTC.")
+
+def time_in_timezone(*args):
+    """
+    Converts the current time to the specified timezone.
+
+    Args:
+        timezone (str): The timezone to convert the time to.
+
+    Returns:
+        time.struct_time: A struct_time object representing the
+            current time in the specified timezone.
+    """
+    return datetime.now(timezone).timetuple()
+
+# Set the converter for the logging.Formatter
+logging.Formatter.converter = time_in_timezone
+
 # Define a logging format
-formatter = logging.Formatter("%(asctime)s - %(levelname)s - %(message)s")
+formatter = logging.Formatter(
+    "%(asctime)s - %(levelname)s - %(message)s",
+    datefmt="%Y-%m-%d %H:%M:%S %Z%z",
+)
 console_handler.setFormatter(formatter)
 
 # Add handlers to the logger
@@ -53,8 +78,10 @@ def log_error(e: object, context: str):
     """
     stack_trace = traceback.format_exc()
 
+    current_time = datetime.now(timezone)
+
     log_entry = {
-        "timestamp": datetime.now(),
+        "timestamp": current_time,
         "context": context,
         "exception_type": type(e).__name__,
         "exception_message": str(e),
@@ -89,8 +116,11 @@ def log_message(message: str, level: str = "info"):
         None
     """
     level = level.lower()
+
+    current_time = datetime.now(timezone)
+
     log_entry = {
-        "timestamp": datetime.now(),
+        "timestamp": current_time,
         "message": message,
         "level": level
     }

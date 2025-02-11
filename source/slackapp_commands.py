@@ -83,13 +83,16 @@ def bug_report(
     # Get the text after the command
     text = body["text"].strip()
 
+    # Current time (YYYY-MM-DD-HH:MM:SS) in the timezone
+    current_time = datetime.datetime.now(timezone).strftime(
+        "%Y-%m-%d %H:%M:%S")
+
     # Create a document to insert
     bug_report_data = {
         "user_id": body["user_id"],
         "user_name": body["user_name"],
         "text": text,
-        "timestamp": datetime.datetime.now(timezone).strftime(
-            "%Y-%m-%d %H:%M:%S")
+        "timestamp": current_time,
     }
 
     # Insert the bug report into the collection
@@ -124,6 +127,10 @@ def feature_request(
     """
     ack()
 
+    # Current time (YYYY-MM-DD-HH:MM:SS) in the timezone
+    current_time = datetime.datetime.now(timezone).strftime(
+        "%Y-%m-%d %H:%M:%S")
+
     # If a text is not provided, send a message to the user
     if not body.get("text", "").strip():
         client.chat_postMessage(
@@ -140,8 +147,7 @@ def feature_request(
         "user_id": body["user_id"],
         "user_name": body["user_name"],
         "text": text,
-        "timestamp": datetime.datetime.now(timezone).strftime(
-            "%Y-%m-%d %H:%M:%S")
+        "timestamp": current_time
     }
 
     # Insert the bug report into the collection
@@ -180,6 +186,10 @@ def search_enable(
             updating the collection.
     """
     ack()
+
+    # Current time (YYYY-MM-DD-HH:MM:SS) in the timezone
+    current_time = datetime.datetime.now(timezone).strftime(
+        "%Y-%m-%d %H:%M:%S")
 
     # Get public channels
     response_public = client.conversations_list(types="public_channel")
@@ -225,8 +235,7 @@ def search_enable(
             "channel_name": body["channel_name"],
             "user_id": body["user_id"],
             "user_name": body["user_name"],
-            "timestamp": datetime.datetime.now(timezone).strftime(
-                "%Y-%m-%d %H:%M:%S")
+            "timestamp": current_time
         }
         summarisation.insert_one(summarisation_data)
 

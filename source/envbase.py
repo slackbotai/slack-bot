@@ -128,7 +128,7 @@ BATCH_MODEL = "gpt-4o-mini"
 SUMMARY_MODEL = "gpt-4o"
 
 # Timezone
-timezone = pytz.timezone("CET")
+timezone = pytz.timezone("Europe/Stockholm") # Change as needed
 
 # Slack team domain
 slack_team_domain = slackapp.client.team_info().data["team"]["domain"]
