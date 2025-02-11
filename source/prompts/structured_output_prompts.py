@@ -26,6 +26,8 @@ Attributes:
     None
 """
 
+from datetime import datetime, timedelta
+
 def classify_user_request_prompt() -> list:
     """
     Classifies user input into one of several predefined categories.
@@ -290,7 +292,27 @@ def time_range_prompt(
         list: A list of system and user messages for extracting
             time ranges.
     """
-    return[
+    today = datetime.strptime(current_date, "%Y-%m-%d").date()
+    last_week_start = (
+        today - timedelta(days=today.weekday() + 7)).strftime("%Y-%m-%d"
+    )
+    last_week_end = (
+        today - timedelta(days=today.weekday() + 1)).strftime("%Y-%m-%d"
+    )
+    last_month_start = (
+        today.replace(day=1) - timedelta(days=1)).replace(
+            day=1).strftime("%Y-%m-%d"
+    )
+    last_month_end = (
+        today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m-%d"
+    )
+    current_year = today.year
+    last_year = current_year - 1
+    # week 47 of last year
+    week_47_start = datetime.strptime(f"{last_year}-11-20", "%Y-%m-%d").date()
+    week_47_end = datetime.strptime(f"{last_year}-11-26", "%Y-%m-%d").date()
+
+    messages = [
         {
             "role": "system",
             "content": (
@@ -306,7 +328,10 @@ def time_range_prompt(
             "role": "system",
             "content": (
                 "Use the current date as a point of reference: "
-                f"'{current_date}'."
+                f"'{current_date}'. If a year is not explicitly "
+                "mentioned, assume the user is referring to the most "
+                "recent occurrence of the specified day, week, month, "
+                "quarter (Q1, Q2, Q3, Q4), or year."
             )
         },
         {
@@ -322,12 +347,58 @@ def time_range_prompt(
             )
         },
         {
+            "role": "system",
+            "content": "Here are some examples:",
+        },
+        {
+            "role": "user",
+            "content": "Show me the data from last week",
+        },
+        {
+            "role": "assistant",
+            "content": f"start_date: '{last_week_start}'\nend_date: '{last_week_end}'",
+        },
+        {
+            "role": "user",
+            "content": "Summarise last month",
+        },
+        {
+            "role": "assistant",
+            "content": f"start_date: '{last_month_start}'\nend_date: '{last_month_end}'",
+        },
+        {
+            "role": "user",
+            "content": "Summarise week 47 of last year",
+        },
+        {
+            "role": "assistant",
+            "content": f"start_date: '{week_47_start}'\nend_date: '{week_47_end}'",
+        },
+        {
+            "role": "user",
+            "content": "What happened on January 15th, 2024?",
+        },
+        {
+            "role": "assistant",
+            "content": "start_date: '2024-01-15'\nend_date: '2024-01-15'",
+        },
+        {
+            "role": "user",
+            "content": "Channel history",
+        },
+        {
+            "role": "assistant",
+            "content": f"start_date: '{start_date}'\nend_date: '{current_date}'",
+        },
+        {
             "role": "user",
             "content": (
                 f"Extract and return a time range from the query: {query}"
             )
         }
     ]
+
+    return messages
 
 
 def update_info_prompt(fields: dict, text: str) -> list:

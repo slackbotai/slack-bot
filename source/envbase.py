@@ -73,6 +73,12 @@ gemini_api_key = os.getenv("GEMINI_API_KEY")
 slack_app_token = os.getenv("SLACK_APP_TOKEN")
 slack_bot_token = os.getenv("SLACK_BOT_TOKEN")
 
+# Serper API Key
+serper_api_key = os.getenv("SERPER_API_KEY")
+
+# Slack Workspace Subdomain
+workspace_subdomain = os.getenv("WORKSPACE_SUBDOMAIN")
+
 # Determine if running inside Docker
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 
@@ -81,8 +87,6 @@ if is_docker:
     MONGO_URI = "mongodb://host.docker.internal:27017/"
 else:
     MONGO_URI = "mongodb://localhost:27017/"
-
-serper_api_key = os.getenv("SERPER_API_KEY")
 
 # Initialise clients and databases
 slack_web_client = WebClient(token=slack_bot_token, ssl=ssl_context)

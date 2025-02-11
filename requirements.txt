@@ -44,7 +44,7 @@ exceptiongroup==1.2.2
     # via anyio
 filetype==1.2.0
     # via langchain-google-genai
-fonttools==4.55.8
+fonttools==4.56.0
     # via matplotlib
 google-ai-generativelanguage==0.6.15
     # via google-generativeai
@@ -68,7 +68,7 @@ google-generativeai==0.8.4
     # via
     #   -r requirements.in
     #   langchain-google-genai
-googleapis-common-protos==1.66.0
+googleapis-common-protos==1.67.0rc1
     # via
     #   google-api-core
     #   grpcio-status
@@ -108,7 +108,7 @@ jsonpointer==3.0.0
     # via jsonpatch
 kiwisolver==1.4.8
     # via matplotlib
-langchain-core==0.3.33
+langchain-core==0.3.34
     # via
     #   langchain-google-genai
     #   langchain-openai
@@ -120,13 +120,13 @@ langchain-openai==0.3.3
     # via -r requirements.in
 langgraph==0.2.68
     # via -r requirements.in
-langgraph-checkpoint==2.0.10
+langgraph-checkpoint==2.0.12
     # via langgraph
 langgraph-sdk==0.1.51
     # via langgraph
-langsmith==0.3.3
+langsmith==0.3.8
     # via langchain-core
-lxml==5.3.0
+lxml==5.3.1
     # via
     #   html-sanitizer
     #   lxml-html-clean

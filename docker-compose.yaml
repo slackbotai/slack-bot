@@ -17,6 +17,7 @@ services:
       - LANGCHAIN_ENDPOINT=${LANGCHAIN_ENDPOINT}
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
       - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}
+      - WORKSPACE_SUBDOMAIN=${WORKSPACE_SUBDOMAIN}
     ports:
       - "5000:5000"  # Expose port 5000 (adjust as needed)
     depends_on:

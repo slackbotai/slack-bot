@@ -29,7 +29,6 @@ Attributes:
     SUMMARY_MODEL (str): The name of the summary summarisation model.
 """
 # Standard library imports
-import os
 import re
 from datetime import datetime, timedelta
 
@@ -38,13 +37,11 @@ import asyncio
 
 # Local application imports
 from envbase import (
-    aiclient, slack_bot_user_id, mongodb, BATCH_MODEL, SUMMARY_MODEL
+    aiclient, slack_bot_user_id, mongodb, BATCH_MODEL, SUMMARY_MODEL,
+    workspace_subdomain,
 )
-from utils.llm_functions import interpret_timerange
-
-MODEL = "gpt-4o-mini"
-FINAL_MODEL = "gpt-4o"
 from prompts.prompts import main_llm_query_prompts
+from utils.llm_functions import interpret_timerange
 from utils.slack_markdown_converter import Markdown2Slack
 from utils.message_utils import post_ephemeral_message_ok
 from utils.cost_tracker import calculate_cost, save_cost_data, save_cost_graph
@@ -54,6 +51,10 @@ from utils.summarisation_utils import (
 )
 from utils.logging_utils import log_message, log_error
 from utils.message_utils import remove_reaction
+
+MODEL = "gpt-4o-mini"
+FINAL_MODEL = "gpt-4o"
+
 
 def handle_summarise_request(
         client: object,
@@ -67,14 +68,14 @@ def handle_summarise_request(
     Handles summarisation requests by retrieving relevant messages
     from MongoDB in batches, calculating similarity, and posting a
     structured summary back to Slack.
- 
+
     Args:
         query (str): The user's query.
         event_ts (str): The timestamp of the event.
         slack_channel_id (str): The ID of the Slack channel.
         user_id (str): The ID of the user making the request.
         say (callable): The function to send messages back to Slack.
- 
+
     Returns:
         None
     """
@@ -169,7 +170,7 @@ def handle_summarise_request(
         all_messages.extend(messages)
 
     # Generate the summary and send it back to Slack
-    formatted_summary = get_summary( # pylint: disable=C0103
+    formatted_summary = get_summary(  # pylint: disable=C0103
         all_messages,
         query,
         say,
@@ -206,13 +207,13 @@ def interpret_time_range(
     """
     Uses GPT-4o to interpret the time range from a natural language
     query.
- 
+
     Args:
         query (str): The user's query.
- 
+
     Returns:
         dict: A dictionary containing the start and end dates.
- 
+
     Raises:
         json.JSONDecodeError: If there is an error parsing the JSON.
     """
@@ -228,12 +229,12 @@ def interpret_time_range(
 
     # Start date of the channel history
     ch_start_date = datetime.fromtimestamp(
-        start_timestamp).strftime("%Y-%m-%d"
-    )
-    response =  interpret_timerange(
+        start_timestamp
+    ).strftime("%Y-%m-%d")
+    response = interpret_timerange(
         current_date,
         ch_start_date,
-        query
+        query,
     )
     # Debug print to verify the raw response format
     log_message(
@@ -255,16 +256,16 @@ def get_start_end_dates(
     """
     Gets the start and end timestamps for the query based on the
     interpreted time range from interpret_time_range func.
- 
+
     Args:
         time_range (dict): The interpreted time range as
             "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"
             from the GPT-4o model output.
         collection (object): The MongoDB collection object.
- 
+
     Returns:
         tuple: A tuple containing the start and end float timestamps.
- 
+
     Raises:
         ValueError: If there is an error parsing the dates.
     """
@@ -281,7 +282,7 @@ def get_start_end_dates(
         end_date = time_range.end_date
 
         try:
-            # Parse the dates and makes sure 
+            # Parse the dates and makes sure
             # end date is at the end of the day
             start_timestamp = datetime.strptime(start_date, "%Y-%m-%d")
             end_timestamp = (
@@ -352,14 +353,14 @@ def batching(
     """
     Func to retrieve messages from MongoDB in batches based on
     the start and end timestamps.
- 
+
     Args:
         start_timestamp (float): The start timestamp for the query.
         end_timestamp (float): The end timestamp for the query.
         collection (object): The MongoDB collection object.
         batch_size (int): The batch size for fetching messages.
         skip (int): The number of documents to skip in MongoDB.
- 
+
     Returns:
         list: A list of batched documents from MongoDB.
     """
@@ -428,8 +429,8 @@ def batching(
         # Stop the loop if fewer documents than batch_size are retrieved
         if len(batch) < batch_size:
             break
-        
-        log_message(    
+
+        log_message(
             f"Fetched batch of {len(batch)} "
             f"documents from MongoDB (skip={skip})",
             "info"
@@ -453,7 +454,7 @@ def batch_unpacking(
         tagged_channel_id (str): The ID of the tagged Slack channel.
         batch_size (int): The batch size for fetching messages.
         skip (int): The number of documents to skip in MongoDB.
-    
+
     Returns:
         list: A list of messages to be summarised.
     """
@@ -495,20 +496,19 @@ def create_message_link(
         root_ts=None,
 ) -> str:
     """
-    Helper func that formats a Slack message URL correctly based on 
+    Helper func that formats a Slack message URL correctly based on
     whether it's a root message or a thread reply.
- 
+
     Args:
         channel_id (str): The ID of the Slack channel.
         reply_ts (str): The timestamp of the reply message.
         root_ts (str): The timestamp of the root message if it's a
             thread reply.
- 
+
     Returns:
         str: The formatted message URL.
     """
     reply_ts_formatted = reply_ts.replace(".", "")
-    workspace_subdomain = os.environ.get("WORKSPACE_SUBDOMAIN")
 
     # Convert timestamp to readable time
     reply_date = datetime.fromtimestamp(float(reply_ts)).strftime('%Y-%m-%d')
@@ -533,7 +533,7 @@ async def summarise_batch(
         model: str,
         query: str,
         batch: str = None,
-        previous_summary:str = None,
+        previous_summary: str = None,
 ) -> tuple:
     """
     Summarises a single batch of messages and
@@ -549,7 +549,7 @@ async def summarise_batch(
     Returns:
         tuple: A tuple containing the summary, prompt tokens,
             completion tokens, and total tokens.
-    
+
     Raises:
         Exception: If there is an error generating the summary.
     """
@@ -569,8 +569,11 @@ async def summarise_batch(
         completion_tokens = response.usage.completion_tokens
         total_tokens = response.usage.total_tokens
 
-        return (response.choices[0].message.content.strip(),
-                prompt_tokens, completion_tokens, total_tokens,
+        return (
+            response.choices[0].message.content.strip(),
+            prompt_tokens,
+            completion_tokens,
+            total_tokens,
         )
     except Exception as e:
         log_error(e, "Error generating summary")
@@ -609,9 +612,9 @@ async def summarise_in_batches(
 
     # Initialise token count
     batch_prompt_tokens = 0  # Tokens for the original batch model input
-    batch_completion_tokens = 0 # Total batch model completion tokens
-    final_completion_tokens = 0 # Completion tokens from final model
-    total_tokens_used = 0 # Total tokens from all operations
+    batch_completion_tokens = 0  # Total batch model completion tokens
+    final_completion_tokens = 0  # Completion tokens from final model
+    total_tokens_used = 0  # Total tokens from all operations
 
     batch_summaries = []
     messages = summary_input.split("\n")

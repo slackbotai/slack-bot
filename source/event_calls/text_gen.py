@@ -78,8 +78,9 @@ def handle_text_processing(
         text_prompt,
         function_state="chat"
     )
+
     openai_request_stream_to_slack(
-        model="gpt-4o-2024-11-20",
+        model="gpt-4o",
         prompt=formatted_messages,
         channel_id=channel_id,
         thread_ts=thread_ts,

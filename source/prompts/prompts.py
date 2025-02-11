@@ -22,6 +22,8 @@ Attributes:
     None
 """
 
+from datetime import datetime, timedelta
+
 def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
     """
     System prompts for the main LLM text generation model.
@@ -34,6 +36,21 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
         list: A list of system prompts for the main LLM text
               generation model.
     """
+    # Get the current date
+    current_date = datetime.now().strftime("%Y-%m-%d")
+    today = datetime.strptime(current_date, "%Y-%m-%d").date()
+
+    last_week_start = (
+        today - timedelta(days=today.weekday() + 7)).strftime("%Y-%m-%d")
+    last_week_end = (
+        today - timedelta(days=today.weekday() + 1)).strftime("%Y-%m-%d")
+    last_month_start = (
+        today.replace(day=1) - timedelta(days=1)).replace(day=1).strftime("%Y-%m-%d")
+    last_month_end = (
+        today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m-%d")
+    current_year = today.year
+    last_year = current_year - 1
+
     return [
         {
             "role": "system",
@@ -158,7 +175,27 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
                         within a single list.
                 """
             )
-        }
+        },
+        {"role": "system", "content": (
+                f"The current date today is {current_date}. Be aware of the current year when responding to queries. "
+                "Always use the current year as your point of reference unless the query includes the year. "
+                "If the user asks a question related to time and doesn't mention a year, "
+                "assume the user is asking about this year or the last occurrence of the event such as week, month, or quarter."
+            )
+        },
+        {"role": "system", "content": "Here are some examples of date/time related queries and responses:"},
+        {"role": "user", "content": "Which dates was last week?"},
+        {"role": "assistant", "content": f"Last week ran from {last_week_start} to {last_week_end}."},
+        {"role": "user", "content": "What was the date of the first day of last month?"},
+        {"role": "assistant", "content": f"The first day of last month was {last_month_start}."},
+        {"role": "user", "content": "What was the date of the last day of last month?"},
+        {"role": "assistant", "content": f"The last day of last month was {last_month_end}."},
+        {"role": "user", "content": "What year is it?"},
+        {"role": "assistant", "content": f"It is {current_year}."},
+        {"role": "user", "content": "What year was it last year?"},
+        {"role": "assistant", "content": f"Last year was {last_year}."},
+        {"role": "user", "content": "What is the current date?"},
+        {"role": "assistant", "content": f"The current date is {current_date}."},
     ]
 
 
@@ -294,7 +331,6 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
     ]
 
 
-# ORIGINAL
 def main_llm_query_prompts(
         slack_bot_user_id: str,
         query: str,
@@ -311,65 +347,51 @@ def main_llm_query_prompts(
     Returns:
         list: A list of system prompts for the main LLM query model.
     """
+    # Input Validation
+    if not query:
+        return [{"role": "system", "content": "Error: Please provide a query to summarise."}]
+
+    if batch is None and summary is None:
+        return [{"role": "system", "content": "Error: No messages or summary provided."}]
+
     return [
         {"role": "system", "content": (
-            "YOUR PERSONAL INFORMATION:\n"
+            f"""
+            You are a summarisation AI assistant and your personal Slack ID is <@{slack_bot_user_id}>.
 
-            f"* Your personal Slack ID is <@{slack_bot_user_id}>."
-            )
-        },
-        {
-        "role": "system", "content": (
-            "YOUR BEHAVIOUR:\n"
+            You are designed to provide concise, work-related summaries of Slack conversations. You will receive *one* of the following sets of inputs:
 
-            "* The provided messages have already been filtered "
-            "by time. You should NOT consider the time range "
-            "within the query when selecting messages.\n"
+            Set 1:
+            * [User Query]: The user's request, describing what they want summarised.
+            * [New Messages]: A batch of new Slack messages. These messages have already been filtered by time, if the [User Query] included a time range.
 
-            "* Your goal is to create a concise bullet-point "
-            "summary of WORK-RELATED discussions and decisions "
-            "that directly relate to the user query.\n"
+            Set 2:
+            * [User Query]: The user's request, describing what they want summarised.
+            * [Previous Summary]: A summary generated from batches of Slack messages that you need to check, and edit if required, to ensure it is work-related and relevant based on the [User Query].
 
-            "* STRICTLY EXCLUDE the following:\n"
-            "    * Casual conversations, greetings, and off-topic banter.\n"
-            "    * Humorous comments, jokes, and playful interactions.\n"
-            "    * Messages primarily focused on social interactions or personal matters.\n"
-            "    * Any requests for any sort of summarisation.\n"
-            "    * Any requests for image generation or other non-work-related tasks.\n"
+            Your task is to create or update a summary based on the following rules:
 
-            "* Each hand-picked message for the final "
-            "summary is structured using bullet points.\n"
+            1. **Initial Summary (Set 1 Received):** If you receive Set 1, create a work-related bullet-point summary of the [New Messages] that are relevant to the [User Query]. Each summarised message should be followed by a placeholder: [link0], [link1], [link2], etc. These will be replaced with links to the original messages.
 
-            "* Each bullet point must be concise and directly "
-            "address the user's query. Only include information "
-            "that falls under the definition of "
-            "WORK-RELATED content above.\n"
+            2. **Update Summary (Set 2 Received):** If you receive Set 2, refine the [Previous Summary] to be work-related, relevant, and concise, based on the [User Query].
 
-            "* Placeholders like [link0], [link1], etc. will be "
-            "added after each of the selected messages. These "
-            "placeholders will be replaced later with clickable "
-            "hyperlinks pointing to the original messages."
-            )
-        },
-        {"role": "system", "content": (
-            "SUMMARY INSTRUCTIONS:\n"
+            3. **No Relevant New Information (Set 1 Received):** If you receive Set 1, but *none* of the [New Messages] are relevant to the [User Query], or if [New Messages] is empty, respond with: "No new information relevant to the query was found in the messages."
 
-            "* Create a summary based on:\n"
-            "    * User Query\n"
-            "    * Previous Summary (if available; otherwise, create a summary of the New Messages)\n"
-            "    * New Messages (if available; otherwise, create an improved and refined final summary based on the Previous Summary)"
+            4. **Length Constraint:** The summary, including link placeholders, should not exceed 3000 characters. If the summary would exceed this length, prioritise the most important information.
+
+            5. **Output:** Your response should *only* contain the summary text or the specific responses defined in rule 3. Do not include any other text, explanations, or chat-like phrases.
+            """
             )
         },
         {
             "role": "user",
             "content": (
-                f"User Query: {query}\n"
-                f"Previous Summary: {summary}\n"
-                f"New Messages: {batch}"
+                f"[User Query]: {query}\n"
+                f"[New Messages]: {batch}"
+                f"[Previous Summary]: {summary}\n"
             )
         },
     ]
-
 
 
 def image_analyse_prompt(instructions: str, base64_image: str) -> list:
@@ -491,5 +513,3 @@ def enhance_query_prompt(
             "Please rewrite this query to make it more specific and effective for summarisation."
         )}
     ]
-
-

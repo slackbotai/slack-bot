@@ -164,13 +164,13 @@ You can also set your bot's profile picture here if you want while you're at it.
     This and the next step are not required, but recommended if you plan on modifying the code and or the requirements.txt file. Else skip to step 4.
 
     ```bash
-    python -m venv venv
+    python -m venv .venv
     ```
 
 3. Activate the virtual environment:
 
     ```bash
-    ./venv/Scripts/activate
+    ./.venv/Scripts/activate
     ```
 
 4. Build the bot application with docker-compose:
@@ -198,7 +198,7 @@ We're using the pip-tools workflow to stay updated within the team, and you or y
 
 2. Then, use the command `pip-compile requirements.in` in your for example VSC powershell terminal which updates your `requirements.txt` file accordingly.
 
-3. Now, you can either use the command `pip-sync` in the same terminal to update your `venv`, or you can run a new `docker-compose up --build`.
+3. Now, you can either use the command `pip-sync` in the same terminal to update your `.venv`, or you can run a new `docker-compose up --build`. If the previous build data is cached, the latter option might not always work.
 
 4. What about if you ever want to updates packages in the future? You can either empty the `requirements.txt` file and run a new `pip-compile requirements.in` then a `pip-sync` command, or you can run `pip-compile requirements.in --upgrade-package openai` to update an individual package, then run the steps above again; `pip-compile requirements.in` then `pip-sync`. That's all you need to know to use this workflow!
 
