@@ -143,20 +143,6 @@ def tagged_collections(
     for tagged_channel_id in tagged_channel_ids:
         if tagged_channel_id in mongodb.list_collection_names():
             collections.append(mongodb[tagged_channel_id])
-            # Info-message to the user to keep an eye on time ranges
-            # as they can vary for each channel depending on channel
-            # creation and LLM interpretation of the query.
-            if len(tagged_channel_ids) > 1:
-                post_ephemeral_message_ok(
-                client=client,
-                channel_id=channel_id,
-                user_id=user_id,
-                thread_ts=event_ts,
-                text=("⚠️ When dealing with multiple channels, keep an eye "
-                    "on the displayed time ranges for each channel in case "
-                    "of any discrepancies due to channel creation date or "
-                    "AI misinterpretation of the provided timeframe."),
-            )
             return collections
         else:
             raise Exception(
@@ -174,6 +160,7 @@ def say_collections_time_ranges(
         channel_id: str,
         event_ts: str,
         say: object,
+        user_id: str,
 ) -> None:
     """
     Support func to display the time ranges of the tagged collections.
@@ -185,29 +172,69 @@ def say_collections_time_ranges(
         channel_id (str): Channel ID where the request was made.
         event_ts (str): Event timestamp of the request.
         say (object): Slack say method to send messages.
+        user_id (str): User ID of the user requesting the summarisation.
     
     Returns:
         None
     """
-    for collection_name, (
-        start_timestamp,
-        end_timestamp) in time_ranges.items():
-        start_date = datetime.fromtimestamp(
-            start_timestamp).strftime('%Y-%m-%d'
-        )
-        end_date = datetime.fromtimestamp(
-            end_timestamp).strftime('%Y-%m-%d'
-        )
+    print("Time Ranges:", time_ranges)
 
-        # Find the respective channel name for collection_name
-        channel_name = client.conversations_info(
-            channel=collection_name)["channel"]["name"]
+    # If there are multiple time ranges in the time_ranges dict and
+    # they have the same start and end time
+    if len(time_ranges.values()) > 1 and len(set(time_ranges.values())) == 1:
+        start_timestamp, end_timestamp = next(iter(time_ranges.values()))
+        start_date = datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d')
+        end_date = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
 
         say(
             channel=channel_id,
             thread_ts=event_ts,
-            text=(f"Time Range: [{start_date} - {end_date}] "
-                  f"for {channel_name}"))
+            text=f"Time Range: [{start_date} - {end_date}] for all tagged channels"
+        )
+    # If there is only one time range in the time_ranges dict
+    elif len(time_ranges.values()) == 1:
+        for collection_name, (start_timestamp, end_timestamp) in time_ranges.items():
+            start_date = datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d')
+            end_date = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
+
+            # Find the respective channel name for collection_name
+            channel_name = client.conversations_info(channel=collection_name)["channel"]["name"]
+
+            say(
+                channel=channel_id,
+                thread_ts=event_ts,
+                text=f"Time Range: [{start_date} - {end_date}] for {channel_name}"
+            )
+    # If there are multiple time ranges in the time_ranges dict and
+    # they have different start and end times
+    else:
+        post_ephemeral_message_ok(
+            client=client,
+            channel_id=channel_id,
+            user_id=user_id,
+            thread_ts=event_ts,
+            text=(
+                "⚠️ You have received multiple time ranges. This is likely "
+                "due to inconsistencies with the AI model or because one time "
+                "range falls outside the creation date of the other "
+                "channel(s). Please consider this discrepancy if it affects "
+                "your intended summary. If necessary, try again or clarify "
+                "the time range using terms like "
+                "'last week', 'last month', 'past 6 months', etc."
+            ),
+        )
+        for collection_name, (start_timestamp, end_timestamp) in time_ranges.items():
+            start_date = datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d')
+            end_date = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
+
+            # Find the respective channel name for collection_name
+            channel_name = client.conversations_info(channel=collection_name)["channel"]["name"]
+
+            say(
+                channel=channel_id,
+                thread_ts=event_ts,
+                text=f"Time Range: [{start_date} - {end_date}] for {channel_name}"
+            )
 
 
 def get_model_batch_size(est_tokens: int,

@@ -137,7 +137,6 @@ def handle_summarise_request(
             f"Processing channel: {collection.name}",
             "info"
         )
-
         # Interpret the time range from the query
         time_range = interpret_time_range(
             query,
@@ -181,9 +180,31 @@ def handle_summarise_request(
     )
     # --------------------> END OF RAG WORKFLOW <-------------------- #
 
+    # # If all collections have the same time range, keep only one
+    # if len(set(time_ranges.values())) == 1:
+    #     time_ranges = {tagged_channel_ids[0]: list(time_ranges.values())[0]}
+    # else:
+    #     # Info-message to the user to keep an eye on time ranges
+    #     # as they can vary for each channel depending on channel
+    #     # creation and LLM interpretation of the query.
+    #     post_ephemeral_message_ok(
+    #         client=client,
+    #         channel_id=channel_id,
+    #         user_id=user_id,
+    #         thread_ts=event_ts,
+    #         text=(
+    #             "⚠️ You have received multiple time ranges. This is likely "
+    #             "due to inconsistencies with the AI model or because one time "
+    #             "range falls outside the creation date of the other "
+    #             "channel(s). Please consider this discrepancy if it affects "
+    #             "your intended summary. If necessary, try again or clarify "
+    #             "the time range using terms like "
+    #             "'last week', 'last month', 'past 6 months', etc."
+    #         ),
+    #     )
     # After processing all collections, report time ranges
     say_collections_time_ranges(
-        time_ranges, client, channel_id, event_ts, say
+        time_ranges, client, channel_id, event_ts, say, user_id,
     )
     # Send the summary back to the Slack thread
     say(
@@ -191,7 +212,6 @@ def handle_summarise_request(
         thread_ts=event_ts,
         text=formatted_summary,
     )
-
     remove_reaction(
         client,
         channel_id,
@@ -300,20 +320,6 @@ def get_start_end_dates(
             )
             start_timestamp, end_timestamp = None, None
 
-        # Check if the time range is more than 6 months
-        if end_timestamp - start_timestamp > 15778463:
-
-            post_ephemeral_message_ok(
-                client=client,
-                channel_id=channel_id,
-                user_id=user_id,
-                thread_ts=event_ts,
-                text=("⚠️ This timeframe might be too broad and could "
-                      "incur high costs. For future reference, "
-                      "consider specifying a narrower timeframe for "
-                      "better performance and cost reduction "
-                      "if possible."),
-            )
         # Check if the time range is more than 6 months
         if end_timestamp - start_timestamp > 15778463:
 

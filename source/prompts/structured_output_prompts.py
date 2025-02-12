@@ -293,6 +293,10 @@ def time_range_prompt(
             time ranges.
     """
     today = datetime.strptime(current_date, "%Y-%m-%d").date()
+    this_week_start = (
+        today - timedelta(days=today.weekday())).strftime("%Y-%m-%d"
+    )
+    print(this_week_start)
     last_week_start = (
         today - timedelta(days=today.weekday() + 7)).strftime("%Y-%m-%d"
     )
@@ -339,7 +343,8 @@ def time_range_prompt(
             "content": (
                 "If the query requests information or summarisation "
                 "based on the start of the channel history, "
-                "or whole channel/ all of the channel, "
+                "the whole channel, or if no specific "
+                "time range can be extracted from the query, "
                 f"return 'start_date' as: '{start_date}', as it is the "
                 "start of the channel history."
                 f"return 'end_date' as: '{current_date}', as it is the "
@@ -349,6 +354,14 @@ def time_range_prompt(
         {
             "role": "system",
             "content": "Here are some examples:",
+        },
+        {
+            "role": "user",
+            "content": "Recap this week",
+        },
+        {
+            "role": "assistant",
+            "content": f"start_date: '{this_week_start}'\nend_date: '{current_date}'",
         },
         {
             "role": "user",
@@ -384,7 +397,15 @@ def time_range_prompt(
         },
         {
             "role": "user",
-            "content": "Channel history",
+            "content": "Summarise the whole channel",
+        },
+        {
+            "role": "assistant",
+            "content": f"start_date: '{start_date}'\nend_date: '{current_date}'",
+        },
+        {
+            "role": "user",
+            "content": "Summarise",
         },
         {
             "role": "assistant",
