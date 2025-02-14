@@ -342,55 +342,63 @@ def main_llm_query_prompts(
     event.
 
     Args:
-        bot_id (str): The bot's Slack ID.
+        slack_bot_user_id (str): The bot's unique Slack ID.
+        query (str): The user's query.
+        batch (str): The batch of new messages.
+        summary (str): The previous summary to review and update.
 
     Returns:
-        list: A list of system prompts for the main LLM query model.
+        list: A list of system and user messages for the main LLM
+            query model.
     """
-    # Input Validation
-    if not query:
-        return [{"role": "system", "content": "Error: Please provide a query to summarise."}]
+    system_prompt = f"""
+        You are a summarisation AI assistant and your personal Slack ID is <@{slack_bot_user_id}>.
 
-    if batch is None and summary is None:
-        return [{"role": "system", "content": "Error: No messages or summary provided."}]
+        Your task is to provide concise, work-related summaries of Slack conversations depending on the user's query. You will receive *one* of the following input sets ([Set 1] or [Set 2]):
 
+        [Set 1]:
+        * [User Query]: The user's request. This will often be a very specific term or phrase or a general request for a summary.
+        * [New Messages]: A batch of new Slack messages. Each message will be followed by a placeholder for a link (e.g., [link0], [link1]).  These placeholders represent links to the original Slack messages.
+
+        [Set 2]:
+        * [User Query]: The user's request. This will often be a very specific term or phrase or a general request for a summary.
+        * [Previous Summary]: An existing summary to review and/or update.
+
+        Follow these rules to create or update the summary:
+
+        1. **Prioritise the Query:** The [User Query] is the *absolute highest priority*.  Only include information that is *directly and explicitly* related to the [User Query].        
+
+        2. **Initial Summary ([Set 1] Received):**
+            * **Specific Query:** If the [User Query] asks about a specific term or information, create a bullet-point summary of work-related [New Messages] that directly mentions or relates to that query.
+            * **General Summary:** If the [User Query] is general (e.g., "Summarise the channel"), create a bullet-point summary of the main work-related topics discussed in [New Messages].
+            * Each bullet point should represent a distinct topic, decision, action item, or key piece of information.
+            * Append placeholders for message links like [link0], [link1], etc., after each bullet point.
+
+        3. **Update Summary ([Set 2] Received):**
+            * **Specific Query:** Refine the [Previous Summary] to be concise and focus on work-related information directly relevant to the [User Query] and that removes any irrelevant content unrelated to the query.
+            * **General Summary:** Refine the [Previous Summary] to be a concise overview of the main work-related topics.
+
+        4. **Irrelevant [New Messages] ([Set 1] Received)**: If [New Messages] contains no information directly relevant to the [User Query] (or no work-related topics for a general query), respond with: "No new information relevant to the query was found in the messages."
+
+        5. **Length Constraint:** Keep the summary, including placeholders, under 3000 characters and keep it concise and relevant depending if the query is specific or general.
+
+        6. **Output Format:** Provide *only* the summary text or the specific response defined in rule 3. Avoid including additional text or explanations.
+        """
+    # User content based on the input received
+    user_content = f"[User Query]: {query}\n"
+
+    # If Set 1 is received, include the batch of new messages
+    if batch is not None:
+        user_content += f"[New Messages]: {batch}\n"
+
+    # If Set 2 is received, include the previous summary
+    elif summary is not None:
+        user_content += f"[Previous Summary]: {summary}\n"
+
+    # Return the system and user messages
     return [
-        {"role": "system", "content": (
-            f"""
-            You are a summarisation AI assistant and your personal Slack ID is <@{slack_bot_user_id}>.
-
-            You are designed to provide concise, work-related summaries of Slack conversations. You will receive *one* of the following sets of inputs:
-
-            Set 1:
-            * [User Query]: The user's request, describing what they want summarised.
-            * [New Messages]: A batch of new Slack messages. These messages have already been filtered by time, if the [User Query] included a time range.
-
-            Set 2:
-            * [User Query]: The user's request, describing what they want summarised.
-            * [Previous Summary]: A summary generated from batches of Slack messages that you need to check, and edit if required, to ensure it is work-related and relevant based on the [User Query].
-
-            Your task is to create or update a summary based on the following rules:
-
-            1. **Initial Summary (Set 1 Received):** If you receive Set 1, create a work-related bullet-point summary of the [New Messages] that are relevant to the [User Query]. Each summarised message should be followed by a placeholder: [link0], [link1], [link2], etc. These will be replaced with links to the original messages.
-
-            2. **Update Summary (Set 2 Received):** If you receive Set 2, refine the [Previous Summary] to be work-related, relevant, and concise, based on the [User Query].
-
-            3. **No Relevant New Information (Set 1 Received):** If you receive Set 1, but *none* of the [New Messages] are relevant to the [User Query], or if [New Messages] is empty, respond with: "No new information relevant to the query was found in the messages."
-
-            4. **Length Constraint:** The summary, including link placeholders, should not exceed 3000 characters. If the summary would exceed this length, prioritise the most important information.
-
-            5. **Output:** Your response should *only* contain the summary text or the specific responses defined in rule 3. Do not include any other text, explanations, or chat-like phrases.
-            """
-            )
-        },
-        {
-            "role": "user",
-            "content": (
-                f"[User Query]: {query}\n"
-                f"[New Messages]: {batch}"
-                f"[Previous Summary]: {summary}\n"
-            )
-        },
+        {"role": "system", "content": system_prompt},
+        {"role": "user", "content": user_content},
     ]
 
 

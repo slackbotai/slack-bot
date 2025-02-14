@@ -128,6 +128,9 @@ def handle_summarise_request(
     # Dictionary to store time ranges for each collection
     time_ranges = {}
 
+    # Keep track of channels where the ephemeral message has been sent
+    sent_messages = set()
+
     for collection in collections:
 
         # Get the tagged channel ID for the summary
@@ -144,7 +147,8 @@ def handle_summarise_request(
         )
         # Get the start and end timestamps for the query
         start_timestamp, end_timestamp = get_start_end_dates(
-            client, channel_id, user_id, event_ts, time_range
+            client, channel_id, user_id,
+            event_ts, time_range, sent_messages,
         )
         # Save the time range for the collection
         time_ranges[collection.name] = (start_timestamp, end_timestamp)
@@ -180,28 +184,6 @@ def handle_summarise_request(
     )
     # --------------------> END OF RAG WORKFLOW <-------------------- #
 
-    # # If all collections have the same time range, keep only one
-    # if len(set(time_ranges.values())) == 1:
-    #     time_ranges = {tagged_channel_ids[0]: list(time_ranges.values())[0]}
-    # else:
-    #     # Info-message to the user to keep an eye on time ranges
-    #     # as they can vary for each channel depending on channel
-    #     # creation and LLM interpretation of the query.
-    #     post_ephemeral_message_ok(
-    #         client=client,
-    #         channel_id=channel_id,
-    #         user_id=user_id,
-    #         thread_ts=event_ts,
-    #         text=(
-    #             "⚠️ You have received multiple time ranges. This is likely "
-    #             "due to inconsistencies with the AI model or because one time "
-    #             "range falls outside the creation date of the other "
-    #             "channel(s). Please consider this discrepancy if it affects "
-    #             "your intended summary. If necessary, try again or clarify "
-    #             "the time range using terms like "
-    #             "'last week', 'last month', 'past 6 months', etc."
-    #         ),
-    #     )
     # After processing all collections, report time ranges
     say_collections_time_ranges(
         time_ranges, client, channel_id, event_ts, say, user_id,
@@ -272,16 +254,22 @@ def get_start_end_dates(
         user_id: str,
         event_ts: str,
         time_range: object,
+        sent_messages: set,
 ) -> tuple:
     """
     Gets the start and end timestamps for the query based on the
     interpreted time range from interpret_time_range func.
 
     Args:
+        client (object): The Slack WebClient object.
+        channel_id (str): The ID of the Slack channel.
+        user_id (str): The ID of the user making the request.
+        event_ts (str): The timestamp of the event.
         time_range (dict): The interpreted time range as
             "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"
             from the GPT-4o model output.
-        collection (object): The MongoDB collection object.
+        sent_messages (set): A set to keep track of channels where
+            the ephemeral message has been sent.
 
     Returns:
         tuple: A tuple containing the start and end float timestamps.
@@ -322,18 +310,19 @@ def get_start_end_dates(
 
         # Check if the time range is more than 6 months
         if end_timestamp - start_timestamp > 15778463:
-
-            post_ephemeral_message_ok(
-                client=client,
-                channel_id=channel_id,
-                user_id=user_id,
-                thread_ts=event_ts,
-                text=("⚠️ This timeframe might be too broad and could "
-                      "incur high costs. For future reference, "
-                      "consider specifying a narrower timeframe for "
-                      "better performance and cost reduction "
-                      "if possible."),
-            )
+            if channel_id not in sent_messages:
+                post_ephemeral_message_ok(
+                    client=client,
+                    channel_id=channel_id,
+                    user_id=user_id,
+                    thread_ts=event_ts,
+                    text=("⚠️ This timeframe might be too broad and could "
+                        "incur high costs. For future reference, "
+                        "consider specifying a narrower timeframe for "
+                        "better performance and cost reduction "
+                        "if possible."),
+                )
+                sent_messages.add(channel_id)
         log_message(
             f"Start Timestamp: {start_timestamp}, "
             f"End Timestamp: {end_timestamp}",
@@ -742,35 +731,31 @@ def get_summary(
         AttributeError: If token usage data is not available
             in the response.
     """
-    # Initialise markdown styler
+    # Initialise the Markdown to Slack converter
     styler = Markdown2Slack()
-
+    # Initialise the final text list and message placeholders
+    final_texts = []
+    # Maps placeholder -> (link, message_index)
     message_placeholders = {}
 
-    # Generate placeholders and links
+    # Create placeholders and the mapping:
     for i, msg in enumerate(all_messages):
         root_ts = msg.get("root_ts", None)
         thread_ts = msg.get("timestamp", None)
-
-        # Construct the link and store it in the dictionary
         message_link = create_message_link(
-            msg["channel_id"],
-            thread_ts, root_ts
+            msg["channel_id"], thread_ts, root_ts
         )
-        message_placeholders[f"[link{i}]"] = message_link
+        placeholder = f"[link{i}]"
+        # Store link AND index
+        message_placeholders[placeholder] = (message_link, i)
+        final_texts.append(f"{msg['text']} {placeholder}")
 
-    # Format the message text with link
-    final_texts = []
-    for i, msg in enumerate(all_messages):
-        final_texts.append(f"{msg['text']} [link{i}]")
-
-    # Join the messages for the AI input
+    # Join the final texts to create the summary input
     summary_input = "\n".join(final_texts)
-
-    # Estimate the number of tokens for the input
+    # Estimate the number of tokens for the summary input
     est_tokens = estimated_tokens(query, summary_input)
 
-    # Generate the summary with the AI model
+    # Generate the summary using the summarisation models
     try:
         summary = asyncio.run(summarise_in_batches(
             query,
@@ -782,13 +767,14 @@ def get_summary(
             event_ts,
             )
         )
-        # Replace placeholders in the final summary
-        for placeholder, link in message_placeholders.items():
+        # Precise Replacement using the mapping:
+        for placeholder, (link, _) in message_placeholders.items():
             summary = summary.replace(placeholder, link)
 
-        # Format the summary using markdown
+        # Convert the summary to Slack-compatible format
         formatted_summary = styler.convert(summary)
 
+    # Handle exceptions and errors
     except Exception as e:
         log_error(e, "Error generating summary")
         say(
@@ -796,9 +782,10 @@ def get_summary(
             text="Sorry, there was an error generating the summary."
         )
         return "", False
+    # Log the summary
     log_message(
         "Sending the summary back to Slack...",
         "info"
     )
-
+    # Return the formatted summary
     return formatted_summary

@@ -296,7 +296,6 @@ def time_range_prompt(
     this_week_start = (
         today - timedelta(days=today.weekday())).strftime("%Y-%m-%d"
     )
-    print(this_week_start)
     last_week_start = (
         today - timedelta(days=today.weekday() + 7)).strftime("%Y-%m-%d"
     )
