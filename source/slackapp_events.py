@@ -150,7 +150,8 @@ def message(
                 thread_ts,
                 channel_id,
                 slack_bot_user_id,
-                user_input
+                user_input,
+                files
             )
 
             if completion != "llm-query":

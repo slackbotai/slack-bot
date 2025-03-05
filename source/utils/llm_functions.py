@@ -185,22 +185,30 @@ def classify_user_request(
         channel_id,
         slack_bot_user_id,
         text: str,
+        files: bool,
 ) -> FunctionResponse:
     """
-    Classify the user's input based on their needs into
-        predefined categories.
+    Classify the user's input based on their needs into predefined categories.
 
     Args:
+        client: The Slack client instance.
+        thread_ts: The timestamp of the Slack thread.
+        channel_id: The ID of the Slack channel.
+        slack_bot_user_id: The user ID of the Slack bot.
         text (str): The user's input message.
+        files (bool): Whether the input includes files.
 
     Returns:
-        FunctionResponse: A classification response with the
-            appropriate category (e.g., 'llm-query').
+        FunctionResponse: The classified function response.
     """
     slack_channel_id_pattern = r"<#([A-Za-z0-9]+)\|>"
     match = re.search(slack_channel_id_pattern, text)
+
     if match:
         return "llm-query"
+
+    elif files:
+        return "llm-chat"
 
     system_prompt = classify_user_request_prompt()
     _, formatted_text = threadreader(
@@ -210,11 +218,13 @@ def classify_user_request(
         slack_bot_user_id,
         system_prompt
     )
+
     response = structured_output(
         formatted_text[-10:],
         FunctionResponse,
         max_completion_tokens=15
     )
+
     return response.function
 
 

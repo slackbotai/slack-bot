@@ -23,3 +23,4 @@ pytz==2024.2
 schedule==1.2.2
 slack-bolt==1.22.0
 slack-sdk==3.34.0
+openpyxl==3.1.5

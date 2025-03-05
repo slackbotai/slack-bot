@@ -57,7 +57,8 @@ def classify_user_request_prompt() -> list:
                 1. **llm-chat**
                    - Purpose: General conversation, casual interactions,
                     requests that do not clearly fit other categories.
-                   - Use as a default category if uncertain.
+                   - Use as a default category if uncertain or files are 
+                     attached with the message.
                    - Examples:
                      - "How are you doing today?"
                      - "Tell me a joke."
