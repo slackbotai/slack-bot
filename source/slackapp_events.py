@@ -29,7 +29,6 @@ from event_calls.web_search import web_browser
 from event_calls.summarisation import handle_summarise_request
 from agentic_workflow.threads_data import active_threads
 from utils.llm_functions import classify_user_request, interpret_summary_bool
-from utils.slack_markdown_converter import Markdown2Slack
 from utils.logging_utils import error_handler, log_error
 from utils.message_utils import (
     extract_event_data,
@@ -39,7 +38,6 @@ from utils.message_utils import (
     add_reaction,
     post_ephemeral_message_ok
 )
-styler = Markdown2Slack()
 
 @slackapp.event("reaction_added")
 def handle_reaction_added_events(body: dict,) -> None:

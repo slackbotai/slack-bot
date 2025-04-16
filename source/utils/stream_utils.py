@@ -25,9 +25,9 @@ Attributes:
 import re
 import tiktoken
 
-from utils.slack_markdown_converter import Markdown2Slack
+from md2slack import SlackMarkdown
 
-styler = Markdown2Slack()
+styler = SlackMarkdown()
 
 def num_tokens_from_string(
         string: str,
@@ -140,7 +140,7 @@ def update_chat_stream(
             client.chat_update(
                 channel=channel_id,
                 ts=response["ts"],
-                text=f"{styler.convert(fix_aistream)}"
+                text=f"{styler(fix_aistream)}"
             )
 
             aistream = aistream[split_point:]
@@ -161,7 +161,7 @@ def update_chat_stream(
                 client.chat_update(
                     channel=channel_id,
                     ts=response["ts"],
-                    text=f"{styler.convert(aistream)}"
+                    text=f"{styler(aistream)}"
                 )
             else:
                 # Stop the loop to handle splitting
@@ -177,7 +177,7 @@ def update_chat_stream(
         client.chat_update(
             channel=channel_id,
             ts=response["ts"],
-            text=f"{styler.convert(aistream)}"
+            text=f"{styler(aistream)}"
         )
     return
 

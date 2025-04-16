@@ -34,6 +34,7 @@ from datetime import datetime, timedelta
 
 # Third-party library imports
 import asyncio
+from md2slack import SlackMarkdown
 
 # Local application imports
 from envbase import (
@@ -42,7 +43,6 @@ from envbase import (
 )
 from prompts.prompts import main_llm_query_prompts
 from utils.llm_functions import interpret_timerange
-from utils.slack_markdown_converter import Markdown2Slack
 from utils.message_utils import post_ephemeral_message_ok
 from utils.cost_tracker import calculate_cost, save_cost_data, save_cost_graph
 from utils.summarisation_utils import (
@@ -732,7 +732,7 @@ def get_summary(
             in the response.
     """
     # Initialise the Markdown to Slack converter
-    styler = Markdown2Slack()
+    styler = SlackMarkdown()
     # Initialise the final text list and message placeholders
     final_texts = []
     # Maps placeholder -> (link, message_index)
@@ -772,7 +772,7 @@ def get_summary(
             summary = summary.replace(placeholder, link)
 
         # Convert the summary to Slack-compatible format
-        formatted_summary = styler.convert(summary)
+        formatted_summary = styler(summary)
 
     # Handle exceptions and errors
     except Exception as e:
