@@ -51,7 +51,7 @@ def generate_embedding(text: str,) -> list:
 def structured_output(
         messages:list,
         structured_class:object,
-        model:str="gpt-4o-mini",
+        model:str="gpt-4.1-mini",
         max_completion_tokens:int=None,
 ) -> object:
     """

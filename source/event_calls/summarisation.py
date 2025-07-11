@@ -52,8 +52,8 @@ from utils.summarisation_utils import (
 from utils.logging_utils import log_message, log_error
 from utils.message_utils import remove_reaction
 
-MODEL = "gpt-4o-mini"
-FINAL_MODEL = "gpt-4o"
+MODEL = "gpt-4.1-mini"
+FINAL_MODEL = "gpt-4.1"
 
 
 def handle_summarise_request(
@@ -207,7 +207,7 @@ def interpret_time_range(
         collection: object,
 ) -> dict:
     """
-    Uses GPT-4o to interpret the time range from a natural language
+    Uses GPT-4.1 to interpret the time range from a natural language
     query.
 
     Args:
@@ -267,7 +267,7 @@ def get_start_end_dates(
         event_ts (str): The timestamp of the event.
         time_range (dict): The interpreted time range as
             "start_date": "YYYY-MM-DD", "end_date": "YYYY-MM-DD"
-            from the GPT-4o model output.
+            from the GPT-4.1 model output.
         sent_messages (set): A set to keep track of channels where
             the ephemeral message has been sent.
 

@@ -49,13 +49,11 @@ from tiktoken import encoding_for_model
 from pdfminer.high_level import extract_text # pylint: disable=import-error
 from pillow_heif import register_heif_opener # pylint: disable=import-error
 
-from prompts.prompts import image_analyse_prompt, gemini_pdf_summary
+from prompts.prompts import gemini_pdf_summary
 from utils.gemini_utils import gemini_request
-from utils.openai_utils import openai_request
 from utils.message_utils import post_ephemeral_message_ok
 from utils.logging_utils import log_error
 from envbase import (
-    slack_bot_user_id,
     thread_storage,
     url_storage,
     aiclient,
@@ -109,7 +107,7 @@ async def datareader(
                  "json", "xml", "yaml", "yml", "sh", "bat", "quip"],
         "docx": ["docx"],
         "pdf": ["pdf"],
-        "excel": ["xls", "xlsx", "xlsm", "xlsb", "odf"],
+        "excel": ["xls", "xlsx", "xlsm", "xlsb", "odf", "csv"],
     }
 
     # Determine the data type
@@ -174,7 +172,7 @@ async def process_file_type(
     tasks = []
 
     if data_type == "image":
-        tasks.append(handle_image(response, instructions))
+        tasks.append(handle_image(response))
     elif data_type == "audio":
         tasks.append(handle_audio(response, file_type))
     elif data_type == "text":
@@ -186,7 +184,7 @@ async def process_file_type(
             response, user_input, file_type,
             channel_id, user_id, thread_ts))
     elif data_type == "excel":
-        tasks.append(handle_excel(response, file_type))
+        tasks.append(handle_excel_and_csv(response, file_type))
     else:
         raise ValueError(f"Unsupported file type: {data_type}")
 
@@ -292,75 +290,45 @@ def cache_db(
     except Exception as e:
         log_error(e, "Error accessing MongoDB.")
         return None
+    
 
-
-async def handle_image(
-        response: object,
-        instructions: str,
-) -> str:
+async def handle_image(response: object) -> str:
     """
-    Process image data using the OpenAI API for image analysis.
+    Process an image from an HTTP response into a base64 encoded string.
+
+    This function opens the image, standardizes it to JPEG format,
+    and encodes it as a base64 string. The image processing is
+    run in a separate thread to be async-friendly.
 
     Args:
-        response (object): The HTTP response object containing
-            the image.
-        instructions (str): Instructions for processing the image.
+        response (object): The HTTP response object containing the image.
 
     Returns:
-        str: The analysis text for the image.
+        str: The base64 encoded string of the image, or a message
+             if no image data is found.
     """
-    # Check if the response content is empty
     if not response.content:
         return "No image data found."
 
-    # Convert image to base64 asynchronously
-    base64_image = await asyncio.to_thread(
-        convert_image_to_base64, response.content)
+    def _convert_to_base64(image_bytes: bytes) -> str:
+        """Synchronous helper to perform the image conversion."""
+        # Open the image from raw bytes
+        img = Image.open(BytesIO(image_bytes))
 
-    # Strip "<@{slack_bot_user_id}> " from the instructions
-    instructions = instructions.replace(f"<@{slack_bot_user_id}> ", "")
+        # Convert the image to RGB to ensure compatibility
+        img = img.convert("RGB")
 
-    # Call the OpenAI API to analyse the image
-    prompt = image_analyse_prompt(instructions, base64_image)
-    api_response = await asyncio.to_thread(openai_request,
-                                            model="gpt-4o",
-                                            prompt=prompt,
-                                            max_tokens=4000)
+        # Save the image to a BytesIO object to avoid filesystem I/O
+        img_byte_arr = BytesIO()
+        img.save(img_byte_arr, format="JPEG")
+        img_byte_arr.seek(0)
 
-    # Extract the analysis results from the API response
-    text = "%%% ANALYSIS RESULTS %%%\n\n"
-    text += api_response.choices[0].message.content
-    text += "\n\n%%% END OF ANALYSIS RESULTS %%%"
+        # Encode the bytes as a base64 string
+        return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
 
-    return text
-
-
-def convert_image_to_base64(image_content: bytes,) -> str:
-    """
-    Helper function to convert image data into a base64 encoded string.
-    This function is run in a separate thread to make it async-friendly.
-
-    Args:
-        image_content (bytes): The raw image content.
-
-    Returns:
-        str: The base64 encoded string representing the image.
-    """
-    # Open the image from raw bytes
-    img = Image.open(BytesIO(image_content))
-
-    # Convert the image to RGB if it is not in that mode
-    img = img.convert("RGB")
-
-    # Save the image to a BytesIO object to avoid filesystem I/O
-    img_byte_arr = BytesIO()
-    # Save in JPEG format to standardise
-    img.save(img_byte_arr, format="JPEG")
-    # Reset the pointer to the start of the BytesIO buffer
-    img_byte_arr.seek(0)
-
-    # Convert the image to base64
-    return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
+    # Run the synchronous conversion function in a separate thread
+    base64_image = await asyncio.to_thread(_convert_to_base64, response.content)
+    return base64_image
 
 
 async def handle_audio(
@@ -480,33 +448,39 @@ async def handle_pdf(
     return text
 
 
-async def handle_excel(
+async def handle_excel_and_csv(
         response: object,
         file_type: str,
 ) -> str:
     """
-    Process Excel files to extract text.
+    Process tabular data files (Excel, CSV) to extract text.
 
     Args:
         response (object): The HTTP response object containing
-            the Excel file.
+            the file.
         file_type (str): The type of the file (extension).
 
     Returns:
-        str: The extracted text from the Excel file.
+        str: The extracted text from the file as a string.
     """
     with tempfile.NamedTemporaryFile(
         suffix=f".{file_type}",
-        delete=False) as temp_excel:
-        temp_excel.write(response.content)
-        temp_excel_path = temp_excel.name
+        delete=False) as temp_file:
+        temp_file.write(response.content)
+        temp_file_path = temp_file.name
 
-    excel = pd.read_excel(temp_excel_path)
-    return excel.to_string()
+    # Use the correct pandas reader based on the file extension
+    if file_type == 'csv':
+        df = pd.read_csv(temp_file_path)
+    else:
+        df = pd.read_excel(temp_file_path)
+    
+    return df.to_string()
 
 
-def count_tokens(text: str,
-                 model: str = "gpt-4o",
+def count_tokens(
+        text: str,
+        model: str = "gpt-4.1",
 ) -> int:
     """
     Count the number of tokens in the given text for
@@ -515,7 +489,7 @@ def count_tokens(text: str,
     Args:
         text (str): The text to tokenise.
         model (str): The model name to use for tokenisation
-            (default: gpt-4o-mini).
+            (default: gpt-4.1).
 
     Returns:
         int: The number of tokens in the text.

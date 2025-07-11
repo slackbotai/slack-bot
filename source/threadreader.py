@@ -186,7 +186,7 @@ async def process_file_async(
 
     try:
         # Simulating datareader as an async call
-        _, file_text = await datareader(
+        data_type, file_text = await datareader(
             url=file_url_private,
             urlheaders=headers,
             user_input=user_input,
@@ -197,23 +197,48 @@ async def process_file_async(
             cache=True,
             instructions=instructions
         )
+        
+        if data_type == "image":
+            # The new prompt text
+            prompt_text = (
+                f"I have attached an image named '{file_name}'. "
+                "**USE** it for context when forming your answer."
+            )
 
-        # Append formatted messages for output
-        formatted_messages.append(
-            {"role": "user", "content": f"<Document Name: {file_name}>"}
-        )
-        formatted_messages.append(
-            {"role": "user", "content": f"<Document URL: {file_url_private}>"}
-        )
-        formatted_messages.append(
-            {"role": "user", "content": "<Document Start:>"}
-        )
-        formatted_messages.append(
-            {"role": "user", "content": file_text}
-        )
-        formatted_messages.append(
-            {"role": "user", "content": "<Document End:>"}
-        )
+            formatted_messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": prompt_text
+                        },
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/jpeg;base64,{file_text}"
+                            }
+                        }
+                    ]
+                }
+            )
+
+        else:
+            formatted_messages.append(
+                {"role": "user", "content": f"<Document Name: {file_name}>"}
+            )
+            formatted_messages.append(
+                {"role": "user", "content": f"<Document URL: {file_url_private}>"}
+            )
+            formatted_messages.append(
+                {"role": "user", "content": "<Document Start:>"}
+            )
+            formatted_messages.append(
+                {"role": "user", "content": file_text}
+            )
+            formatted_messages.append(
+                {"role": "user", "content": "<Document End:>"}
+            )
 
     except Exception:
         raise
@@ -302,7 +327,7 @@ def threadreader(
     )
 
     formatted_messages = []
-    if sys_prompts is not None:
+    if sys_prompts:
         formatted_messages.extend(sys_prompts)
 
     browse_executed = [False]

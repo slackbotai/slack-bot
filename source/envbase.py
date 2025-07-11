@@ -54,18 +54,20 @@ import ssl
 
 # Third-Party Imports
 import pytz
-import certifi
 from openai import OpenAI
 import google.generativeai as genai
-from dotenv import load_dotenv # pylint: disable=E0611
+from dotenv import load_dotenv  # pylint: disable=E0611
 from slack_bolt.app import App
 from pymongo import MongoClient
 from slack_sdk import WebClient
 
+# Load environment variables
 load_dotenv(override=True)
 
-ssl_context = ssl.create_default_context(cafile=certifi.where())
-ssl_context.set_ciphers("TLSv1.2")
+# Secure SSL context configuration
+ssl_context = ssl.create_default_context()
+ssl_context.minimum_version = ssl.TLSVersion.TLSv1_2
+ssl_context.maximum_version = ssl.TLSVersion.TLSv1_3
 
 # API Keys and Tokens
 openai_api_key = os.getenv("OPENAI_API_KEY")
@@ -74,14 +76,14 @@ slack_app_token = os.getenv("SLACK_APP_TOKEN")
 slack_bot_token = os.getenv("SLACK_BOT_TOKEN")
 
 # Serper API Key
-serper_api_key = os.getenv("SERPER_API_KEY")
+serper_api_key = os.getenv("SERPER_API_KEY", None)
 
 # Slack Workspace Subdomain
 workspace_subdomain = os.getenv("WORKSPACE_SUBDOMAIN")
 
 # Determine if running inside Docker
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
-
+print(f"Running in Docker: {is_docker}")
 # Use 'mongo' for Docker, 'localhost' for local development
 if is_docker:
     MONGO_URI = "mongodb://host.docker.internal:27017/"
@@ -89,6 +91,7 @@ else:
     MONGO_URI = "mongodb://localhost:27017/"
 
 # Initialise clients and databases
+
 slack_web_client = WebClient(token=slack_bot_token, ssl=ssl_context)
 slackapp = App(token=slack_bot_token)
 aiclient = OpenAI(api_key=openai_api_key)
@@ -124,8 +127,8 @@ if "Logging" not in informationdb.list_collection_names():
 logging = informationdb["Logging"]
 
 # Summarisation Openai models
-BATCH_MODEL = "gpt-4o-mini"
-SUMMARY_MODEL = "gpt-4o"
+BATCH_MODEL = "gpt-4.1-mini"
+SUMMARY_MODEL = "gpt-4.1"
 
 # Timezone
 timezone = pytz.timezone("Europe/Stockholm") # Change as needed

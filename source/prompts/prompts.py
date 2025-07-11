@@ -24,6 +24,8 @@ Attributes:
 
 from datetime import datetime, timedelta
 
+from datetime import datetime, timedelta
+
 def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
     """
     System prompts for the main LLM text generation model.
@@ -36,7 +38,7 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
         list: A list of system prompts for the main LLM text
               generation model.
     """
-    # Get the current date
+    # Get the current date and calculate relevant date ranges
     current_date = datetime.now().strftime("%Y-%m-%d")
     today = datetime.strptime(current_date, "%Y-%m-%d").date()
 
@@ -44,10 +46,15 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
         today - timedelta(days=today.weekday() + 7)).strftime("%Y-%m-%d")
     last_week_end = (
         today - timedelta(days=today.weekday() + 1)).strftime("%Y-%m-%d")
-    last_month_start = (
-        today.replace(day=1) - timedelta(days=1)).replace(day=1).strftime("%Y-%m-%d")
-    last_month_end = (
-        today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m-%d")
+
+    # Correctly calculate the start and end of the last month
+    first_day_of_current_month = today.replace(day=1)
+    last_day_of_last_month = first_day_of_current_month - timedelta(days=1)
+    first_day_of_last_month = last_day_of_last_month.replace(day=1)
+
+    last_month_start = first_day_of_last_month.strftime("%Y-%m-%d")
+    last_month_end = last_day_of_last_month.strftime("%Y-%m-%d")
+
     current_year = today.year
     last_year = current_year - 1
 
@@ -88,18 +95,16 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
         {
             "role": "system",
             "content": (
-                "Refer to yourself as '@Ai' in all messages. "
-                f"Your Slack ID is <@{bot_id}>."
+                f"Refer to yourself as '@{bot_id}' in all messages."
             )
         },
         {
             "role": "system",
             "content": (
-            "When mentioning the user, use their Slack ID in the "
-            f"format `<@{user_id}>` without any additional formatting "
-            "or quotation marks. Ensure that the mention is included "
-            "in the message as plain text so that Slack can "
-            "interpret it correctly."
+                f"**CRITICAL INSTRUCTION ON HOW TO RESPOND:**\n\n"
+                f"1. **Understanding Input**: In the conversation history, messages from users are prefixed with their `Name (slack_id):` to help you identify who is speaking in a multi-user thread. You must pay attention to this to follow the conversation.\n\n"
+                f"2. **Generating Output**: That prefix is for your context ONLY. **You must not, under any circumstances, copy this format.** Your own responses must contain *only the message content* and should not have any prefix.\n\n"
+                f"3. **Mentioning Users**: If you need to specifically address the user who started this thread, you can mention them with `<@{user_id}>`. Use this sparingly and only when necessary to get their attention, not in every message."
             )
         },
         {
@@ -144,22 +149,22 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
                 General Rules:
                 1. **Bullet Point Types:**
                     - Use only numbers (e.g., `1.`), letters 
-                        (e.g., `A)`), or dashes (`-`) for bullet points.
+                      (e.g., `A)`), or dashes (`-`) for bullet points.
                     - **NEVER** use the `•` symbol for bullet points.
 
                 2. **Indentation for Multi-Level Lists:**
                     - Always indent all bullet points and sub-points 
-                        by 4 spaces.
+                      by 4 spaces.
                     - Main titles (e.g., `1.`, `2.`) can 
-                        remain unindented.
+                      remain unindented.
                     - All other points (e.g., `A)`, `-`) must be 
-                        indented to reflect hierarchy.
+                      indented to reflect hierarchy.
                     - Examples of correct formatting:
                         1. Main Title
                             A) Bullet point under the main title
                                 - Sub-point under the bullet point
                                 - Another sub-point under the 
-                                    bullet point
+                                  bullet point
                         2. Another Main Title
                             - Bullet point under another main title
                             - Another bullet point under the same title
@@ -172,7 +177,7 @@ def main_llm_text_prompts(bot_id: str, user_id: str,) -> list:
                 3. **Consistency and Clarity:**
                     - Use clear and concise phrasing for all list items.
                     - Maintain consistent indentation and bullet styles 
-                        within a single list.
+                      within a single list.
                 """
             )
         },
