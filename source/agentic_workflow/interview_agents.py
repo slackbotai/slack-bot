@@ -69,7 +69,7 @@ from agentic_workflow.input_agents import wait_for_feedback_periodically
 
 llm = ChatOpenAI(
     api_key=openai_api_key,
-    model='gpt-4o-mini',
+    model='gpt-5-mini',
     temperature=0
 )
 

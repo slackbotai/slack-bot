@@ -201,7 +201,7 @@ def error_handler(
         prompt = error_message_prompt(context, e)
 
         completion = openai_request(
-            model="gpt-4.1-mini",
+            model="gpt-5-mini",
             prompt=prompt
         )
         say(

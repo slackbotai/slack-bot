@@ -127,8 +127,8 @@ if "Logging" not in informationdb.list_collection_names():
 logging = informationdb["Logging"]
 
 # Summarisation Openai models
-BATCH_MODEL = "gpt-4.1-mini"
-SUMMARY_MODEL = "gpt-4.1"
+BATCH_MODEL = "gpt-5-mini"
+SUMMARY_MODEL = "gpt-5"
 
 # Timezone
 timezone = pytz.timezone("Europe/Stockholm") # Change as needed
