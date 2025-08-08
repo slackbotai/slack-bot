@@ -168,7 +168,7 @@ def web_browser(
             search_term
         )
         openai_request_stream_to_slack(
-            model="gpt-5",
+            model="gpt-4.1",
             prompt=input_history,
             channel_id=channel_id,
             thread_ts=thread_ts,

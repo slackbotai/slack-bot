@@ -52,8 +52,8 @@ from utils.summarisation_utils import (
 from utils.logging_utils import log_message, log_error
 from utils.message_utils import remove_reaction
 
-MODEL = "gpt-5-mini"
-FINAL_MODEL = "gpt-5"
+MODEL = "gpt-4.1-mini"
+FINAL_MODEL = "gpt-4.1"
 
 
 def handle_summarise_request(

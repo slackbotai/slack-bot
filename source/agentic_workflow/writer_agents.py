@@ -48,7 +48,7 @@ from agentic_workflow.graph_classes import ResearchGraphState
 
 llm = ChatOpenAI(
     api_key=openai_api_key,
-    model='gpt-5-mini',
+    model='gpt-4o-mini',
     temperature=0
 )
 
