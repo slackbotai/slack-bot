@@ -22,6 +22,7 @@ Attributes:
 """
 
 from langchain_openai import OpenAIEmbeddings
+from slack_sdk import WebClient
 
 from envbase import aiclient, openai_api_key
 from utils.stream_utils import update_chat_stream
@@ -86,7 +87,7 @@ def openai_request_stream_to_slack(
         channel_id: str,
         thread_ts: str,
         event_ts: str,
-        client: object,
+        client: WebClient,
         response_id: str = None,
         max_tokens: int = None,
         temperature: float = None,
@@ -127,7 +128,7 @@ def openai_request_stream_to_slack(
     response = client.chat_postMessage(
         channel=channel_id,
         thread_ts=thread_ts,
-        text="Response..."
+        text="*_Thinking :loading:_*"
     )
 
     # Process and update the message stream

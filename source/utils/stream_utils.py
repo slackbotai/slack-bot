@@ -25,9 +25,10 @@ Attributes:
 import re
 import base64
 import tiktoken
+import tempfile
 
+from slack_sdk import WebClient
 from md2slack import SlackMarkdown
-from openai.types.responses import ResponseTextDeltaEvent, ResponseImageGenCallPartialImageEvent
 
 styler = SlackMarkdown()
 
@@ -106,7 +107,7 @@ def safe_split(
 
 
 def update_chat_stream(
-        client: object,
+        client: WebClient,
         channel_id: str,
         completion: list,
         response: dict,
@@ -127,6 +128,7 @@ def update_chat_stream(
         str: The updated text stream
     """
     slack_msg_limit = 3500  # Slack message character limit == 4000
+    print(completion)
 
     for count, chunk in enumerate(completion):
         print(chunk.type)
@@ -135,10 +137,16 @@ def update_chat_stream(
             idx = chunk.partial_image_index
             image_base64 = chunk.partial_image_b64
             image_bytes = base64.b64decode(image_base64)
-            with open(f"river{idx}.png", "wb") as f:
-                f.write(image_bytes)
+
+            # No 'with tempfile' needed!
+            client.files_upload_v2(
+                channel=channel_id,
+                thread_ts=response["ts"],
+                content=image_bytes,      # <--- Pass the bytes directly here
+                filename="image.png"  # <--- REQUIRED: You must provide a filename when using 'content'
+            )
                 
-        if isinstance(chunk, ResponseTextDeltaEvent):
+        if chunk.type == "response.output_text.delta":
             print("Text delta chunk received.")
             # Concatenate the response to the aistream
             aistream += chunk.delta or ""
