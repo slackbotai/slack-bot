@@ -88,7 +88,10 @@ print(f"Running in Docker: {is_docker}")
 if is_docker:
     MONGO_URI = "mongodb://host.docker.internal:27017/"
 else:
-    MONGO_URI = "mongodb://localhost:27017/"
+    if os.getenv("MONGODB_CLOUD_URI"):
+        MONGO_URI = os.getenv("MONGODB_CLOUD_URI")
+    else:
+        MONGO_URI = "mongodb://localhost:27017/"
 
 # Initialise clients and databases
 

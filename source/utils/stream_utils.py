@@ -23,9 +23,11 @@ Attributes:
 """
 
 import re
+import base64
 import tiktoken
 
 from md2slack import SlackMarkdown
+from openai.types.responses import ResponseTextDeltaEvent, ResponseImageGenCallPartialImageEvent
 
 styler = SlackMarkdown()
 
@@ -127,10 +129,19 @@ def update_chat_stream(
     slack_msg_limit = 3500  # Slack message character limit == 4000
 
     for count, chunk in enumerate(completion):
-
-        if chunk.choices[0].delta.content is not None:
+        print(chunk.type)
+        if chunk.type == "response.image_generation_call.partial_image":
+            print("Image generation chunk received.")
+            idx = chunk.partial_image_index
+            image_base64 = chunk.partial_image_b64
+            image_bytes = base64.b64decode(image_base64)
+            with open(f"river{idx}.png", "wb") as f:
+                f.write(image_bytes)
+                
+        if isinstance(chunk, ResponseTextDeltaEvent):
+            print("Text delta chunk received.")
             # Concatenate the response to the aistream
-            aistream += chunk.choices[0].delta.content
+            aistream += chunk.delta or ""
         aistream_placeholder = replace_emojis_with_placeholder(aistream)
         if len(aistream_placeholder) > slack_msg_limit:
             split_point = split_aistream(aistream, slack_msg_limit)
@@ -168,12 +179,10 @@ def update_chat_stream(
                 # in the next iteration
                 break
 
-        # Look for finish signal to end streaming
-        if chunk.choices[0].finish_reason == "stop":
-            break
-
     # Check if the message exceeds Slack's character limit
     if len(aistream_placeholder) < slack_msg_limit:
+        if aistream == "":
+            aistream = "Image"
         client.chat_update(
             channel=channel_id,
             ts=response["ts"],

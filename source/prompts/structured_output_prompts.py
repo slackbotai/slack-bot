@@ -65,36 +65,9 @@ def classify_user_request_prompt() -> list:
                      - "I want some advice on organizing my study
                         schedule."
 
-                2. **llm-imagegen**
-                   - Purpose: Requests related to generating images,
-                    illustrations, or visual art.
-                   - The user is asking to create or imagine an image,
-                    scene, or illustration.
-                   - Examples:
-                     - "Generate an image of a magical forest under a
-                        blue moon."
-                     - "Create a drawing of a cat riding a unicycle."
-                     - "I need a concept art piece of a futuristic car."
-
-                3. **llm-browse**
-                   - Purpose: Explicit requests to search or browse
-                    external, recent, or linked information.
-                   - If the user provides a link or explicitly asks to
-                    find recent data or news, use this category.
-                   - Examples:
-                     - "Find the latest news on Mars exploration."
-                     - "Check out this link: http://example.com"
-                     - "Browse for updates on the stock market."
-                     - "Search for current weather conditions in London."
-
                 ### Important Rules:
-                - If the input requests image creation or generation,
-                    choose llm-imagegen.
-                - If the input explicitly mentions browsing or recent
-                    info, choose llm-browse.
                 - If there is any ambiguity, default to llm-chat.
-                - Output only the category name: "llm-chat",
-                    "llm-imagegen", "llm-browse".
+                - Output only the category name: "llm-chat"
                 - Do not output any additional text or explanation.
                     Just the category.
                 """

@@ -80,12 +80,11 @@ def handle_text_processing(
     )
 
     openai_request_stream_to_slack(
-        model="gpt-4.1",
+        model="gpt-5.1",
         prompt=formatted_messages,
         channel_id=channel_id,
         thread_ts=thread_ts,
         event_ts=event_ts,
         client=client,
-        say=say
     )
     log_message("Bot chat response sent", "info")

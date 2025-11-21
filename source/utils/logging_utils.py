@@ -207,7 +207,7 @@ def error_handler(
         say(
             channel=channel_id,
             thread_ts=thread_ts,
-            text=f"{completion.choices[0].message.content}"
+            text=f"{completion}"
         )
     except Exception as openai_error:
         log_error(

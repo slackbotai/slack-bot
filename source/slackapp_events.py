@@ -25,7 +25,6 @@ Attributes:
 from envbase import slackapp, slack_bot_user_id
 from event_calls.image_gen import handle_image_generation
 from event_calls.text_gen import handle_text_processing
-from event_calls.web_search import web_browser
 from event_calls.summarisation import handle_summarise_request
 from agentic_workflow.threads_data import active_threads
 from utils.llm_functions import classify_user_request, interpret_summary_bool
@@ -86,10 +85,10 @@ def handle_acknowledge_summary_warning(
 @slackapp.event("message")
 @slackapp.event("file_shared")
 def message(
-        args: dict,
-        client: object,
-        say: callable,
-        ack: callable,
+    args: dict,
+    client: object,
+    say: callable,
+    ack: callable,
 ) -> None:
     """
     Handle messages sent by users to the Slack app.
@@ -183,17 +182,6 @@ def message(
                     thread_ts,
                     channel_id,
                     user_id
-                )
-
-            elif "llm-browse" in completion and not files:
-                error_context = "Error: Web browsing"
-                web_browser(
-                    client,
-                    channel_id,
-                    event_ts,
-                    slack_bot_user_id,
-                    say,
-                    thread_ts
                 )
 
             elif "llm-imagegen" in completion:

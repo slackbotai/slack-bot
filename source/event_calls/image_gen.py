@@ -21,6 +21,7 @@ import requests
 
 from PIL import Image
 
+from slack_sdk.web.client import WebClient
 from threadreader import threadreader
 from envbase import aiclient, slack_bot_user_id
 from utils.llm_functions import generate_image_request
@@ -28,7 +29,7 @@ from utils.message_utils import remove_reaction
 from utils.logging_utils import log_message
 
 def handle_image_generation(
-        client: object,
+        client: WebClient,
         say: callable,
         thread_ts: str,
         event_ts:str,

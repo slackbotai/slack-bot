@@ -185,7 +185,6 @@ def ask_user_for_info_with_ai(
             prompt = prompt_to_retrieve_users_choices(state, field_to_ask)
 
             ai_question = openai_request("gpt-4o-mini", prompt, 100, 0.2)
-            ai_question = ai_question.choices[0].message.content
             latest_ts = None
 
             response = send_message_with_retry(

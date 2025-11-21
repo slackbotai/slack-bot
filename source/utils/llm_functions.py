@@ -67,7 +67,7 @@ class FunctionResponse(BaseModel):
     Args:
         content (str): The user's input message.
     """
-    function: Literal['llm-chat', 'llm-imagegen', 'llm-browse']
+    function: Literal['llm-chat']
 
 
 class ImageGenerationRequest(BaseModel):
@@ -222,7 +222,6 @@ def classify_user_request(
     response = structured_output(
         formatted_text[-10:],
         FunctionResponse,
-        max_completion_tokens=15
     )
 
     return response.function

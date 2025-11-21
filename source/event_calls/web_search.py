@@ -152,31 +152,4 @@ def web_browser(
             max_results
         )
 
-    if max_results == 10:
-        current_date = datetime.datetime.now().strftime('%Y-%m-%d')
-        browse_prompt = summarisation_llm_text_prompts(
-            slack_bot_user_id, current_date
-        )
-        _, input_history = threadreader(
-            client,
-            thread_ts,
-            channel_id,
-            slack_bot_user_id,
-            browse_prompt,
-            "chat",
-            browse_mode,
-            search_term
-        )
-        openai_request_stream_to_slack(
-            model="gpt-4.1",
-            prompt=input_history,
-            channel_id=channel_id,
-            thread_ts=thread_ts,
-            event_ts=event_ts,
-            client=client,
-            say=say,
-        )
-        log_message("Web search completed", "info")
-        return
-    else:
-        return browse_mode
+    return browse_mode

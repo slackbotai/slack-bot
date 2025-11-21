@@ -51,8 +51,7 @@ def generate_embedding(text: str,) -> list:
 def structured_output(
         messages:list,
         structured_class:object,
-        model:str="gpt-4.1-mini",
-        max_completion_tokens:int=None,
+        model:str="gpt-5-mini",
 ) -> object:
     """
     Call the OpenAI API to generate a structured output from
@@ -72,13 +71,12 @@ def structured_output(
         object: The structured_class object with the response
             from the AI model.
     """
-    response = aiclient.beta.chat.completions.parse(
+    response = aiclient.responses.parse(
         model=model,
-        messages=messages,
-        response_format=structured_class,
-        max_completion_tokens=max_completion_tokens
+        input=messages,
+        text_format=structured_class,
     )
-    response = response.choices[0].message.parsed
+    response = response.output_parsed
     return response
 
 
@@ -89,7 +87,7 @@ def openai_request_stream_to_slack(
         thread_ts: str,
         event_ts: str,
         client: object,
-        say: callable,
+        response_id: str = None,
         max_tokens: int = None,
         temperature: float = None,
 ) -> None:
@@ -111,15 +109,22 @@ def openai_request_stream_to_slack(
         None
     """
     # Initiate a streamed response from the AI model
-    completion = aiclient.chat.completions.create(
+    repsonse_stream = aiclient.responses.create(
         model=model,
-        messages=prompt,
+        input=prompt,
         stream=True,
-        max_tokens=max_tokens,
-        temperature=temperature
+        previous_response_id=response_id,
+        max_output_tokens=max_tokens,
+        temperature=temperature,
+        tool_choice="auto",
+        tools=[
+            {"type": "web_search"},
+            {"type": "image_generation"}
+        ],
+        truncation="auto",
     )
     # Send an initial message to notify the user of an incoming response
-    response = say(
+    response = client.chat_postMessage(
         channel=channel_id,
         thread_ts=thread_ts,
         text="Response..."
@@ -129,7 +134,7 @@ def openai_request_stream_to_slack(
     update_chat_stream(
         client,
         channel_id,
-        completion,
+        repsonse_stream,
         response,
         aistream=""
     )
@@ -150,7 +155,6 @@ def openai_request(
         temperature: float = None,
         stream: bool = False,
         top_p: float = None,
-        response_format = None,
 ) -> str:
     """
     Send a request to OpenAI's API to generate a response based
@@ -165,24 +169,21 @@ def openai_request(
         temperature (float, optional): The temperature for the model.
         stream (bool, optional): Whether to stream the response or not.
         top_p (float, optional): The nucleus sampling parameter.
-        response_format (optional): Custom format or configuration
-            for the response, if applicable.
 
     Returns:
         str or iterator: The response from the AI model. If
             "stream=True", returns the raw generator for streaming;
             otherwise, returns the full response as a string.
     """
-    completion = aiclient.chat.completions.create(
+    response = aiclient.responses.create(
         model=model,
         top_p=top_p,
         stream=stream,
-        messages=prompt,
-        max_tokens=max_tokens,
+        input=prompt,
+        max_output_tokens=max_tokens,
         temperature=temperature,
-        response_format=response_format,
     )
-    return completion
+    return response.output if not stream else response
 
 
 def generate_embedding_batch(
