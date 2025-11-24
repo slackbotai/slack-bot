@@ -28,53 +28,6 @@ Attributes:
 
 from datetime import datetime, timedelta
 
-def classify_user_request_prompt() -> list:
-    """
-    Classifies user input into one of several predefined categories.
-
-    Args:
-        None
-
-    Returns:
-        list: A list containing a system message
-            (the classification instructions)
-            and a user message (the actual user input).
-    """
-    return [
-        {
-            "role": "system",
-            "content": (
-                """
-                You are a helpful and strictly rule-following AI
-                assistant. Your task is to classify the user's input 
-                into exactly one of the following categories, based on
-                the content and instructions below. You must adhere to
-                these rules precisely and produce only one category
-                name as the final answer, take in context all user
-                answers but lay most focus on the last message.
-
-                ### Categories:
-                1. **llm-chat**
-                   - Purpose: General conversation, casual interactions,
-                    requests that do not clearly fit other categories.
-                   - Use as a default category if uncertain or files are 
-                     attached with the message.
-                   - Examples:
-                     - "How are you doing today?"
-                     - "Tell me a joke."
-                     - "I want some advice on organizing my study
-                        schedule."
-
-                ### Important Rules:
-                - If there is any ambiguity, default to llm-chat.
-                - Output only the category name: "llm-chat"
-                - Do not output any additional text or explanation.
-                    Just the category.
-                """
-            )
-        }
-    ]
-
 
 def generate_image_request_prompt(text: str) -> list:
     """
@@ -197,54 +150,45 @@ def extract_new_info_prompt(text: str) -> list:
 
 def interpret_summary_bool_prompt(text: str) -> list:
     """
-    Checks if the user is asking for a summary of Slack
-    channel information.
+    Constructs a prompt optimized for modern LLMs (GPT-4o, etc.) to 
+    classify if a query requires Slack internal context.
 
     Args:
         text (str): User's query.
 
     Returns:
-        list: System and user messages to determine if the query is
-            Slack-related.
+        list: The formatted messages payload.
     """
     return [
         {
-            "role": "system",
-                "content": (
-                "You are a concise assistant. Your task is to "
-                "evaluate whether the user is requesting a summary "
-                "of information from a Slack channel. Look for "
-                "keywords related to Slack or a request for a "
-                "recap of channel conversations, discussions, "
-                "specific topics, or "
-                "past messages. If the query contains a URL, "
-                "do not treat it as a summary request "
-                "and return 'False'."
-            )
-        },
-        {
-            "role": "system",
+            "role": "developer",
             "content": (
-                "If the user asks for a summary of a Slack "
-                "channel, return 'True'. If the user requests a "
-                "summary or information related to a web page "
-                "(e.g., via a URL), return 'False'. If the query "
-                "involves historical data, summaries of topics, or "
-                "related information, consider the context to "
-                "determine if it is referring to Slack."
+                "You are an Intent Classification Agent for a Slack bot. "
+                "Your job is to determine if the user needs information from internal Slack history.\n\n"
+                
+                "### CLASSIFICATION RULES\n"
+                "Return 'True' if the query matches ANY of these criteria:\n"
+                "1. Explicitly mentions a Slack channel (starts with '#', e.g., '#general', '#updates').\n"
+                "2. Asks for a summary, recap, or catch-up of recent conversations.\n"
+                "3. Asks 'what happened' or 'what was said' regarding a specific topic internally.\n\n"
+                
+                "Return 'False' if the query falls into these categories:\n"
+                "1. General Chit-Chat (e.g., 'Hello', 'Who are you?').\n"
+                "2. Image Generation (e.g., 'Generate a picture', 'Draw this').\n"
+                "3. Web Search / External Info (e.g., 'Google this', 'Summarize this URL...').\n"
+                "4. Coding/Math tasks unrelated to team communication.\n\n"
+                
+                "### PRIORITY OVERRIDE\n"
+                "If the input text contains a channel tag (e.g., <#C12345> or #channel-name), "
+                "you MUST return 'True', regardless of other content.\n\n"
+                
+                "### OUTPUT FORMAT\n"
+                "Respond ONLY with the boolean string: 'True' or 'False'."
             )
         },
         {
             "role": "user",
-            "content": (
-                f"This is the user query: '{text}'. "
-                "Please check and verify if the user is asking for "
-                "a summary related to Slack (such as a recap of "
-                "Slack conversations or channel discussions). "
-                "Return 'True' if the query indicates a request "
-                "for Slack-related content, "
-                "otherwise return 'False'."
-            )
+            "content": f"{text}"
         }
     ]
 

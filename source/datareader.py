@@ -63,15 +63,8 @@ from envbase import (
 register_heif_opener()
 
 async def datareader(
-        url: str,
-        urlheaders: dict,
-        user_input: str,
-        thread_id: str,
-        channel_id: str,
-        user_id: str,
+        response: object,
         file_type: str,
-        cache: bool,
-        instructions: str,
 ) -> tuple[str, str]:
     """
     Read data from a URL and process it based on the file type.
@@ -80,15 +73,8 @@ async def datareader(
     type, and returns the processed text along with the data type.
 
     Args:
-        url (str): The URL of the file to be processed.
-        urlheaders (dict): The headers to be used for the URL request.
-        user_input (str): The user input message.
-        thread_id (str): The identifier for the thread handling the request.
-        channel_id (str): The identifier for the channel.
-        user_id (str): The identifier for the user.
+        response (object): The HTTP response object containing the file.
         file_type (str): The type of the file (extension).
-        cache (bool): Whether to cache the processed text.
-        instructions (str): Instructions for processing the file.
     
     Returns:
         tuple[str, str]: A tuple containing the data type and the
@@ -116,37 +102,17 @@ async def datareader(
             data_type = type_key
             break
 
-    # Cache handling logic
-    if cache:
-        text = cache_db(url, thread_id, channel_id, mode="load")
-        if text:
-            return data_type, text
-
-    # Asynchronous request handling
-    response = await asyncio.to_thread(
-        requests.get, url, headers=urlheaders, timeout=10
-    )
     text = await process_file_type(
-        response, user_input, data_type, file_type,
-        url, instructions, channel_id, user_id, thread_id
+        response, data_type, file_type,
     )
-    # If cache is enabled, save the processed text
-    if cache:
-        cache_db(url, thread_id, channel_id, text, "save")
 
     return data_type, text
 
 
 async def process_file_type(
         response: object,
-        user_input: str,
         data_type: str,
         file_type: str,
-        url: str,
-        instructions: str,
-        channel_id: str,
-        user_id: str,
-        thread_ts: str,
 ) -> str:
     """
     This function processes the file based on its type asynchronously
@@ -154,14 +120,8 @@ async def process_file_type(
 
     Args:
         response (object): The HTTP response object containing the file.
-        user_input (str): The user input message.
         data_type (str): The type of the file.
         file_type (str): The extension of the file.
-        url (str): The URL of the file.
-        instructions (str): Instructions for processing the file.
-        channel_id (str): The identifier for the channel.
-        user_id (str): The identifier for the user.
-        thread_ts (str): The timestamp of the thread.
 
     Returns:
         str: The processed text from the file.
@@ -171,18 +131,12 @@ async def process_file_type(
     """
     tasks = []
 
-    if data_type == "image":
-        tasks.append(handle_image(response))
-    elif data_type == "audio":
+    if data_type == "audio":
         tasks.append(handle_audio(response, file_type))
     elif data_type == "text":
         tasks.append(response.text())
     elif data_type == "docx":
         tasks.append(handle_docx(response, file_type))
-    elif data_type == "pdf":
-        tasks.append(handle_pdf(
-            response, user_input, file_type,
-            channel_id, user_id, thread_ts))
     elif data_type == "excel":
         tasks.append(handle_excel_and_csv(response, file_type))
     else:
@@ -193,34 +147,6 @@ async def process_file_type(
     # In this case, there should be only one result per task,
     # so return the first result
     return result[0]
-
-
-def url_to_filename(url: str,) -> str:
-    """
-    Convert a URL into a safe filename by removing special characters.
-
-    Args:
-        url (str): The URL to be converted into a filename.
-
-    Returns:
-        str: The sanitized filename based on the URL.
-
-    Raises:
-        ValueError: If the URL is empty or invalid.
-    """
-    # Remove the protocol (http or https) from the URL
-    url = re.sub(r"https?://", "", url)
-
-    # Replace slashes / with underscores _ to make the filename valid
-    url = url.replace("/", "_")
-
-    # Remove any characters that are not alphanumeric, dashes, or underscores
-    url = re.sub(r"[^a-zA-Z0-9-_]", "", url)
-
-    # Append the '.md' extension to the sanitized filename
-    url += ".md"
-
-    return url
 
 
 def cache_db(

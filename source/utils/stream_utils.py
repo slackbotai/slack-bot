@@ -109,6 +109,7 @@ def safe_split(
 def update_chat_stream(
         client: WebClient,
         channel_id: str,
+        thread_ts: str,
         completion: list,
         response: dict,
         aistream: str,
@@ -120,6 +121,7 @@ def update_chat_stream(
     Args:
         client (object): The Slack client object.
         channel_id (str): The ID of the Slack channel.
+        thread_ts (str): The thread timestamp for the message.
         completion (list): A list of completions from the AI model.
         response (dict): The response dictionary from the Slack API.
         aistream (str): The current text stream.
@@ -128,26 +130,25 @@ def update_chat_stream(
         str: The updated text stream
     """
     slack_msg_limit = 3500  # Slack message character limit == 4000
-    print(completion)
 
     for count, chunk in enumerate(completion):
-        print(chunk.type)
+        if chunk.type == "response.created":
+            response_id = chunk.response.id
+            response_created_time = chunk.response.created_at
+            print(chunk)
+
         if chunk.type == "response.image_generation_call.partial_image":
-            print("Image generation chunk received.")
-            idx = chunk.partial_image_index
             image_base64 = chunk.partial_image_b64
             image_bytes = base64.b64decode(image_base64)
 
-            # No 'with tempfile' needed!
             client.files_upload_v2(
                 channel=channel_id,
-                thread_ts=response["ts"],
-                content=image_bytes,      # <--- Pass the bytes directly here
-                filename="image.png"  # <--- REQUIRED: You must provide a filename when using 'content'
+                thread_ts=thread_ts,
+                content=image_bytes,
+                filename="image.png"
             )
                 
         if chunk.type == "response.output_text.delta":
-            print("Text delta chunk received.")
             # Concatenate the response to the aistream
             aistream += chunk.delta or ""
         aistream_placeholder = replace_emojis_with_placeholder(aistream)
@@ -190,13 +191,17 @@ def update_chat_stream(
     # Check if the message exceeds Slack's character limit
     if len(aistream_placeholder) < slack_msg_limit:
         if aistream == "":
-            aistream = "Image"
-        client.chat_update(
-            channel=channel_id,
-            ts=response["ts"],
-            text=f"{styler(aistream)}"
-        )
-    return
+            client.chat_delete(
+                channel=channel_id,
+                ts=response["ts"],
+            )
+        else:
+            client.chat_update(
+                channel=channel_id,
+                ts=response["ts"],
+                text=f"{styler(aistream)}"
+            )
+    return response_id, response_created_time
 
 
 def split_aistream(aistream: str, slack_msg_limit: int,) -> int:

@@ -47,10 +47,8 @@ from typing import Literal, Optional
 
 from pydantic import BaseModel
 
-from threadreader import threadreader
 from utils.openai_utils import structured_output
 from prompts.structured_output_prompts import (
-    classify_user_request_prompt,
     generate_image_request_prompt,
     suggest_search_term_prompt,
     extract_new_info_prompt,
@@ -177,54 +175,6 @@ class UpdateInfo(BaseModel):
     """
     field: Optional[str]= None
     update_text: Optional[str] = None
-
-
-def classify_user_request(
-        client,
-        thread_ts,
-        channel_id,
-        slack_bot_user_id,
-        text: str,
-        files: bool,
-) -> FunctionResponse:
-    """
-    Classify the user's input based on their needs into predefined categories.
-
-    Args:
-        client: The Slack client instance.
-        thread_ts: The timestamp of the Slack thread.
-        channel_id: The ID of the Slack channel.
-        slack_bot_user_id: The user ID of the Slack bot.
-        text (str): The user's input message.
-        files (bool): Whether the input includes files.
-
-    Returns:
-        FunctionResponse: The classified function response.
-    """
-    slack_channel_id_pattern = r"<#([A-Za-z0-9]+)\|>"
-    match = re.search(slack_channel_id_pattern, text)
-
-    if match:
-        return "llm-query"
-
-    elif files:
-        return "llm-chat"
-
-    system_prompt = classify_user_request_prompt()
-    _, formatted_text = threadreader(
-        client,
-        thread_ts,
-        channel_id,
-        slack_bot_user_id,
-        system_prompt
-    )
-
-    response = structured_output(
-        formatted_text[-10:],
-        FunctionResponse,
-    )
-
-    return response.function
 
 
 def generate_image_request(text: str,) -> tuple[str, str]:

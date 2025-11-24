@@ -25,3 +25,4 @@ slack-bolt
 slack-sdk
 openpyxl
 md2slack
+aiohttp

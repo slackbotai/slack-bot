@@ -810,12 +810,17 @@ def save_channel_info_to_mongodb(
             {"channel_id": channel_id, "channel_name": channel_name}
             for channel_id, channel_name in channel_info
         ]
-        channels.insert_many(channel_data)
-        log_message(
-            "Channel information saved to MongoDB",
-            'info'
-        )
-
+        if channel_data:
+            channels.insert_many(channel_data)
+            log_message(
+                "Channel information saved to MongoDB",
+                'info'
+            )
+        else:
+            log_message(
+                "No channel information to save to MongoDB",
+                'info'
+            )
     except Exception as e:
         log_error(e, "Error saving channel information to MongoDB.")
 

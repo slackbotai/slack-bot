@@ -24,7 +24,7 @@ Attributes:
 from langchain_openai import OpenAIEmbeddings
 from slack_sdk import WebClient
 
-from envbase import aiclient, openai_api_key
+from envbase import aiclient, openai_api_key, thread_manager
 from utils.stream_utils import update_chat_stream
 from utils.message_utils import remove_reaction
 
@@ -84,6 +84,7 @@ def structured_output(
 def openai_request_stream_to_slack(
         model: str,
         prompt: str,
+        instructions: str,
         channel_id: str,
         thread_ts: str,
         event_ts: str,
@@ -110,9 +111,11 @@ def openai_request_stream_to_slack(
         None
     """
     # Initiate a streamed response from the AI model
+    print(prompt)
     repsonse_stream = aiclient.responses.create(
         model=model,
         input=prompt,
+        instructions=instructions,
         stream=True,
         previous_response_id=response_id,
         max_output_tokens=max_tokens,
@@ -132,9 +135,10 @@ def openai_request_stream_to_slack(
     )
 
     # Process and update the message stream
-    update_chat_stream(
+    new_response_id, response_created_at = update_chat_stream(
         client,
         channel_id,
+        thread_ts,
         repsonse_stream,
         response,
         aistream=""
@@ -147,6 +151,22 @@ def openai_request_stream_to_slack(
         event_ts,
         "hourglass_flowing_sand"
     )
+
+    if response_id:
+        # Save the new response ID for future reference
+        thread_manager.update_thread_metadata(
+            thread_ts,
+            channel_id,
+            {"openai_thread_id": new_response_id, "done_ts": response_created_at}
+        )
+    else:
+        # Create a new thread document with the response ID
+        thread_manager.save_thread(
+            channel_id,
+            thread_ts,
+            openai_thread_id=new_response_id,
+            done_ts=response_created_at
+        )
 
 
 def openai_request(
@@ -184,7 +204,7 @@ def openai_request(
         max_output_tokens=max_tokens,
         temperature=temperature,
     )
-    return response.output if not stream else response
+    return response.output_text if not stream else response
 
 
 def generate_embedding_batch(

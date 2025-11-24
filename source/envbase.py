@@ -60,6 +60,7 @@ from dotenv import load_dotenv  # pylint: disable=E0611
 from slack_bolt.app import App
 from pymongo import MongoClient
 from slack_sdk import WebClient
+from utils.thread_manager import ThreadManager
 
 # Load environment variables
 load_dotenv(override=True)
@@ -114,6 +115,11 @@ summarisation = informationdb["Summarisation"]
 channels = informationdb["Channels"]
 thread_storage = informationdb["ThreadStorage"]
 url_storage = informationdb["URLStorage"]
+threads = informationdb["Threads"]
+
+thread_manager = ThreadManager(
+    threads
+)
 
 # Create the time series collection (if it doesn't exist)
 if "Logging" not in informationdb.list_collection_names():

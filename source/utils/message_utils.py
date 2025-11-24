@@ -109,29 +109,38 @@ def is_direct_message(
 
 
 def preprocess_user_input(
-        user_input: str,
-        event_ts: str,
-        thread_ts: str,
+        user_input: str, 
+        event_ts: str, 
+        thread_ts: str
 ) -> tuple:
     """
-    Clean and prepare the user's input message and timestamp
-    for processing.
-
-    Args:
-        user_input (str): The user's original input message.
-        event_ts (str): The event timestamp.
-        thread_ts (str): The thread timestamp, if available.
+    Clean the bot mention and check if a channel is tagged immediately after.
+    
+    Logic:
+    1. Remove Bot mention.
+    2. Check if the very first remaining characters are a channel tag.
+    3. Return the cleaned text (keeping the channel tag) and a boolean flag.
 
     Returns:
-        tuple: A tuple containing the cleaned input message and
-            the effective thread timestamp.
+        tuple: (cleaned_input, thread_ts, channel_detected)
     """
-    # Remove bot's mention from the input
-    cleaned_input = user_input.replace(f"<@{slack_bot_user_id}>", "", 1)
-    # Use event timestamp as thread timestamp if not provided
+    # 1. Remove bot's mention
+    # We strip() to ensure the channel tag moves to index 0 if it exists
+    cleaned_input = user_input.replace(f"<@{slack_bot_user_id}>", "", 1).strip()
+
+    # 2. Check for channel match at the START of the string
+    # Pattern: <# followed by ID, optional name, ending with >
+    match = re.match(r"<#[A-Z0-9]+(?:\|.*?)?>", cleaned_input)
+    
+    # Convert the match object to a simple True/False
+    channel_detected = bool(match)
+
+    # 3. Use event timestamp as thread timestamp if not provided
     if thread_ts is None:
         thread_ts = event_ts
-    return cleaned_input, thread_ts
+
+    # Note: cleaned_input still contains the <#C123> tag if it was present
+    return cleaned_input, thread_ts, channel_detected
 
 
 def add_reaction(

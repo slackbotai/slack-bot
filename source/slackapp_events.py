@@ -21,13 +21,12 @@ Attributes:
     styler (Markdown2Slack): An instance of the Markdown to Slack
         converter for formatting messages.
 """
-
+import re
 from envbase import slackapp, slack_bot_user_id
-from event_calls.image_gen import handle_image_generation
 from event_calls.text_gen import handle_text_processing
 from event_calls.summarisation import handle_summarise_request
 from agentic_workflow.threads_data import active_threads
-from utils.llm_functions import classify_user_request, interpret_summary_bool
+from utils.llm_functions import interpret_summary_bool
 from utils.logging_utils import error_handler, log_error
 from utils.message_utils import (
     extract_event_data,
@@ -129,7 +128,7 @@ def message(
 
         if is_direct_message(client, user_input, user_id, channel_id):
 
-            user_input, thread_ts = preprocess_user_input(
+            user_input, thread_ts, channel_detected = preprocess_user_input(
                 user_input,
                 event_ts,
                 thread_ts
@@ -142,16 +141,8 @@ def message(
                 "hourglass_flowing_sand"
             )
 
-            completion = classify_user_request(
-                client,
-                thread_ts,
-                channel_id,
-                slack_bot_user_id,
-                user_input,
-                files
-            )
-
-            if completion != "llm-query":
+            value = None
+            if channel_detected:
                 # Interpret if a summary is requested
                 try:
                     value = interpret_summary_bool(user_input)
@@ -173,28 +164,7 @@ def message(
                 except Exception as e:
                     log_error(e, context="Error: Interpret summary bool")
 
-            if "llm-chat" in completion:
-                error_context = "Error: Text processing"
-                handle_text_processing(
-                    client,
-                    say,
-                    event_ts,
-                    thread_ts,
-                    channel_id,
-                    user_id
-                )
-
-            elif "llm-imagegen" in completion:
-                error_context = "Error: Image generation"
-                handle_image_generation(
-                    client,
-                    say,
-                    thread_ts,
-                    event_ts,
-                    channel_id
-            )
-
-            elif "llm-query" in completion:
+            if value:
                 error_context = "Error: Summarise request"
                 handle_summarise_request(
                     client,
@@ -204,6 +174,17 @@ def message(
                     user_id,
                     say
                 )
+            else:
+                error_context = "Error: Text processing"
+                handle_text_processing(
+                    client,
+                    event_ts,
+                    thread_ts,
+                    channel_id,
+                    user_id,
+                    files
+                )
+
 
     except Exception as e:
         error_handler(

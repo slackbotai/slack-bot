@@ -26,11 +26,15 @@ Attributes:
     slack_bot_token (str): Slack bot token used for authorisation.
 """
 
+import io
+import aiohttp
+import base64
 import asyncio
 from datareader import datareader
-from envbase import slack_bot_token
+from envbase import slack_bot_token, slack_bot_user_id, thread_manager, aiclient
 from utils.web_reader import process_urls_async
 from utils.slack_utils import get_member_name
+from utils.logging_utils import log_error, log_message
 
 
 def fetch_replies(
@@ -188,7 +192,6 @@ async def process_file_async(
         # Simulating datareader as an async call
         data_type, file_text = await datareader(
             url=file_url_private,
-            urlheaders=headers,
             user_input=user_input,
             thread_id=thread_ts,
             channel_id=channel_id,
@@ -291,6 +294,7 @@ def threadreader(
         channel_id: str,
         bot_user_id: str,
         sys_prompts: list = None,
+        files: list = None,
         function_state:str = None,
         browse_mode:bool = False,
         search_term: str = None,
@@ -347,3 +351,314 @@ def threadreader(
         )
 
     return "", formatted_messages
+
+
+async def process_thread(
+    client,
+    channel_id: str,
+    thread_ts: str
+) -> tuple:
+    """
+    Fetches the ENTIRE thread history and processes it into two distinct lists:
+    1.  agent_thread: The complete conversation for full agent context.
+    2.  response_thread: Only user messages newer than the last run.
+
+    Args:
+        client: An authenticated Slack WebClient instance.
+        channel_id: The ID of the channel containing the thread.
+        thread_ts: The timestamp of the parent message of the thread.
+        thread_stamps: A dictionary containing state, like the `done_ts` timestamp.
+
+    Returns:
+        A tuple containing (agent_thread, response_thread).
+    """
+    # Get the timestamp of the last message we've already processed. Default to "0" for the first run.
+    thread_stamps = thread_manager.get_thread(
+        thread_ts,
+        channel_id
+    )
+
+    response_id = thread_stamps.get("openai_thread_id") if thread_stamps else None
+    done_ts = thread_stamps.get("done_ts") if thread_stamps else None
+
+    # --- Step 1: Fetch the FULL thread. `done_ts` is set to None. ---
+    thread_data, user_dict = await thread_reader(client, channel_id, thread_ts)
+
+    response_thread = []
+
+    if not thread_data.get("messages"):
+        log_error(f"No messages found in thread {thread_ts}", "process_full_thread")
+        return [], []
+
+    # --- Step 2: Process all messages in a single pass ---
+    for message in thread_data["messages"]:
+        user_id = message.get("user", slack_bot_user_id)
+        message_text = message.get("text", "").strip()
+        message_ts = message.get("ts")
+
+        # --- Case 1: The message is from a human user ---
+        if user_id != slack_bot_user_id:
+            files = message.get("files", [])
+            message_data = preprocess_user_input(message_text, files)
+            
+            username = user_dict.get(user_id, "Unknown User")
+            message_data['user_input'] = f"{username}: {message_data['user_input']}"
+            
+            content_blocks = await build_openai_content(message_data)
+            
+            user_message_obj = {
+                "role": "user",
+                "content": content_blocks,
+                "ts": message_ts
+            }
+            
+            # Add to the full history for the agent
+            response_thread.append(user_message_obj)
+        # --- Case 2: The message is from our AI bot ---
+        elif user_id == slack_bot_user_id and message_text:
+            content_blocks = [{
+                "type": "output_text",
+                "text": message_text
+            }]
+
+            assistant_message_obj = {
+                "role": "assistant",
+                "content": content_blocks,
+                "ts": message_ts
+            }
+            
+            # Add bot messages only to the agent's full history
+            response_thread.append(assistant_message_obj)
+
+    return response_thread, response_id, done_ts
+
+
+async def thread_reader(
+    client, channel_id: str, thread_ts: str, done_ts: str | None = None
+) -> tuple:
+    """Safely reads a Slack thread with error handling and retries.
+
+    This is a robust wrapper around the `conversations_replies` API call. It
+    uses a retry mechanism to handle rate limiting and includes comprehensive
+    error handling to prevent crashes, returning empty objects on failure.
+
+    Args:
+        client: An authenticated Slack WebClient instance.
+        channel_id: The ID of the channel containing the thread.
+        thread_ts: The timestamp of the parent message of the thread.
+        done_ts: An optional timestamp to fetch only new messages.
+
+    Returns:
+        A tuple containing (thread_data, user_dict). On failure, returns ({}, {}).
+    """
+    try:
+        # Use retry wrapper for rate limiting & errors
+        thread = client.conversations_replies(
+            channel=channel_id,
+            ts=thread_ts,
+            oldest=done_ts
+        )
+        
+        if not thread or not thread.get("ok"):
+            raise ValueError(f"Slack thread fetch failed for {thread_ts}")
+
+        # Build a dictionary of user IDs to usernames
+        user_dict = build_user_dict(thread, slack_bot_user_id)
+        return thread, user_dict
+
+    except Exception as e:
+        log_error(e, f"Failed to fetch thread {thread_ts} in channel {channel_id}")
+        return {}, {}
+    
+
+def preprocess_user_input(user_input: str, files: list) -> tuple:
+    """
+    Cleans and preprocesses user input for further processing and extracts file information.
+
+    Args:
+        user_input (str): The raw user input text.
+        files (list): A list of attached files, if any.
+
+    Returns:
+        dict: A dictionary containing:
+            - cleaned_input (str): The cleaned user input with bot mentions removed.
+            - files (list): A list of dictionaries with file information (name and URL).
+    """
+    # Remove the bot mention from the user input
+    cleaned_input = user_input.replace(f"<@{slack_bot_user_id}>", "", 1)
+
+    # Extract file information
+    file_info = []
+    if files:
+        for file in files:
+            mimetype = (file.get("mimetype") or "").lower()
+            print(file)
+            file_info.append({
+                "file_name": file.get("name"),
+                "file_url": file.get("url_private"),
+                "mimetype": mimetype,
+                "file_type": file.get("filetype"),
+            })
+
+    return {"user_input": cleaned_input, "files": file_info}
+
+
+async def build_openai_content(message_data: dict) -> list[dict]:
+    """
+    Build OpenAI Responses-style content from Slack message_data:
+      - input_text
+      - input_image (for image/*)
+      - input_file  (for application/pdf)
+    """
+    md = message_data or {}
+    text = md.get("user_input") or ""
+    content = [{"type": "input_text", "text": text}]
+
+    files = md.get("files") or []
+    if files:
+        async with aiohttp.ClientSession() as session:
+            file_blocks = await files_to_openai_content(files, session)
+            content.extend(file_blocks)
+
+    return content
+
+
+async def download_slack_file(url: str, session: aiohttp.ClientSession) -> bytes:
+    """
+    Downloads a file asynchronously using aiohttp.
+    """
+    headers = {"Authorization": f"Bearer {slack_bot_token}"}
+    async with session.get(url, headers=headers, timeout=30) as response:
+        response.raise_for_status()
+        return await response.read()
+
+
+async def files_to_openai_content(files: list[dict], session) -> list[dict]:
+    """
+    Convert Slack file dicts → OpenAI Responses content blocks.
+      - image/*         -> input_image (data URL, keep original mimetype)
+      - application/pdf -> input_file (uploaded via Files API → file_id)
+
+    `files` items must include: { "mimetype", "file_url" or "url_private", "file_name" or "name" }
+    """
+    blocks: list[dict] = []
+
+    for f in files or []:
+        mt = ((f.get("mimetype") or "").lower()).split(";")[0]
+        url = f.get("file_url") or f.get("url_private")
+        if not url or not mt:
+            continue
+
+        try:
+            blob = await download_slack_file(url, session)
+
+            if mt.startswith("image/"):
+                b64 = base64.b64encode(blob).decode("utf-8")
+                blocks.append({
+                    "type": "input_image",
+                    "detail": "high",
+                    "image_url": f"data:{mt};base64,{b64}",
+                })
+
+            # else:
+            #     virtual_file = io.BytesIO(blob)
+            #     file = aiclient.files.create(
+            #         file=(f.get("file_name"), virtual_file, mt),
+            #         purpose="user_data",
+            #         expires_after={
+            #             "anchor": "created_at",
+            #             "seconds": 60*60*24*30
+            #         }
+            #     )
+            #     blocks.append({
+            #         "type": "input_file",
+            #         "file_id": file.id,
+            #     })
+                
+
+            # elif mt == "application/pdf":
+            #     b64 = base64.b64encode(blob).decode("utf-8")
+            #     filename = f.get("file_name") or "document.pdf"
+            #     blocks.append({
+            #         "type": "input_file",
+            #         "filename": filename,
+            #         "file_data": f"data:application/pdf;base64,{b64}",
+            #     })
+            
+            else:
+                data_type, file_text = await datareader(
+                    blob,
+                    file_type=f.get("file_type"),
+                )
+                blocks.append({
+                    "type": "input_text",
+                    "text": f"<file> {f.get('file_name')}\n{file_text} </file>",
+                })
+
+
+        except Exception as e:
+            log_message(f"Error processing file {url}: {e}", "error")
+            continue
+
+    return blocks
+
+
+def filter_and_clean_thread(
+    thread: list = [],
+    done_ts: str = None,
+    until_ts: str = None,
+):
+    """
+    Filters a thread, keeping only messages newer than done_ts and OLDER THAN until_ts, 
+    AND returns the full thread with timestamps removed.
+
+    It removes the timestamp key ("ts") from the messages in *both*
+    returned lists to prepare them for an API.
+
+    Args:
+        thread: The full list of message dictionaries.
+        done_ts: The timestamp of the last processed message (lower bound).
+        until_ts: The timestamp of the message that triggered this run (upper bound).
+
+    Returns:
+        A tuple containing two lists:
+        1. (processed_thread): A new list containing only *new* (filtered), cleaned messages.
+        2. (full_thread_cleaned): A new list containing *all* original messages, but cleaned (ts removed).
+    """
+    processed_thread = []
+    full_thread_cleaned = [] 
+    
+    # Convert timestamps once outside the loop for efficiency
+    done_ts_float = float(done_ts) if done_ts else None
+    until_ts_float = float(until_ts) if until_ts else None
+
+    for message in thread:
+        message_ts_str = message.get("ts")
+        message_ts = float(message_ts_str) if message_ts_str else None
+        
+        # We must skip messages that lack a timestamp
+        if not message_ts:
+            continue
+            
+        # --- Check 1: Exclude messages newer than the trigger message (until_ts) ---
+        # This prevents the bot from "seeing" messages sent while it was processing
+        if until_ts_float and message_ts > until_ts_float:
+            continue
+            
+        # --- Clean Logic (Create copy and remove ts) ---
+        message_copy = message.copy()
+        message_copy.pop("ts", None) 
+        
+        # --- Add to the *full* cleaned list ---
+        # This list includes all relevant historical messages up to the trigger message.
+        full_thread_cleaned.append(message_copy) 
+        
+        # --- Check 2: Filter Logic (Excludes messages older than done_ts) ---
+        # Skip this message for the *processed* list if it's already been processed
+        if done_ts_float and message_ts <= done_ts_float:
+            continue
+            
+        # --- Add to the *processed* list ---
+        processed_thread.append(message_copy)
+            
+    return processed_thread, full_thread_cleaned
