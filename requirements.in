@@ -26,3 +26,4 @@ slack-sdk
 openpyxl
 md2slack
 aiohttp
+python-pptx

@@ -83,16 +83,14 @@ serper_api_key = os.getenv("SERPER_API_KEY", None)
 workspace_subdomain = os.getenv("WORKSPACE_SUBDOMAIN")
 
 # Determine if running inside Docker
-is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
-print(f"Running in Docker: {is_docker}")
-# Use 'mongo' for Docker, 'localhost' for local development
-if is_docker:
-    MONGO_URI = "mongodb://host.docker.internal:27017/"
-else:
-    if os.getenv("MONGODB_CLOUD_URI"):
-        MONGO_URI = os.getenv("MONGODB_CLOUD_URI")
-    else:
-        MONGO_URI = "mongodb://localhost:27017/"
+MONGO_URI = os.getenv("MONGO_URI")
+
+# This is the last-resort fallback for when you run the Python file 
+# directly on your machine without Docker or any environment variables set.
+if not MONGO_URI:
+    MONGO_URI = "mongodb://localhost:27017/"
+
+print(f"Connecting to MongoDB at: {MONGO_URI}")
 
 # Initialise clients and databases
 

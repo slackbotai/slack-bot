@@ -6,8 +6,7 @@ services:
     container_name: slack_bot
     environment:
       - IS_DOCKER=true  # Indicates the app is running inside Docker
-      - MONGO_URI_DOCKER=mongodb://host.docker.internal:27017/  # MongoDB connection URI for Docker
-      - MONGO_URI=mongodb://mongo:27017/
+      - MONGO_URI=${MONGO_URI:-mongodb://mongo:27017/}
       - OPENAI_API_KEY=${OPENAI_API_KEY}  # OpenAI API key
       - SERPER_API_KEY=${SERPER_API_KEY}  # Serper API key
       - SLACK_APP_TOKEN=${SLACK_APP_TOKEN}  # Slack app token
