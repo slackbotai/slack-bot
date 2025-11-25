@@ -37,6 +37,7 @@ Attributes:
 
 import datetime
 
+from utils.logging_utils import log_message
 from utils.logging_utils import error_handler
 from agentic_workflow.workflow import report_agentic_workflow
 from agentic_workflow.threads_data import enter_agentic_workflow
@@ -311,29 +312,33 @@ def create_report(
         say: callable,
 ) -> None:
     """
-    Slack command to create a report.
-
-    When the command is used, the user is prompted to provide a brief
-    description of the report they want to create. The user is then
-    prompted to provide more information about the report.
-
-    Args:
-        ack (callable): Acknowledges the action.
-        body (dict): The body of the action.
-        client (object): The Slack client.
-        say (callable): The say function.
-    
-    Returns:
-        None
-    
-    Raises:
-        Exception: Raised in case of errors while
-            sending messages or opening a DM.
+    DEPRECATED: Slack command to create a report.
+    This function now only returns a deprecation message.
     """
-    # Acknowledge the action
     try:
         ack()
+    except Exception:
+        return
 
+    try:
+        user_id = body['user']['id']
+        
+        channel_id = body.get('container', {}).get('channel_id')
+
+        client.chat_postEphemeral(
+            channel=channel_id,
+            user=user_id,
+            text=":warning: **Feature Deprecated:** The 'Create Report' workflow is no longer available via this button."
+        )
+
+    except Exception as e:
+        log_message(f"Error sending deprecation notice: {e}")
+
+    # ---------------------------------------------------------
+    # ORIGINAL LOGIC (Preserved but disabled)
+    # ---------------------------------------------------------
+    """
+    try:
         # Extract user ID from the body
         user_id = body['user']['id']
 
@@ -397,3 +402,4 @@ def create_report(
     except Exception as e:
         error_handler(e, client, dm_channel_id, say, thread_ts,
                       event_ts, context="Error: Report creation.")
+    """

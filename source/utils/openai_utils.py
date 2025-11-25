@@ -62,11 +62,10 @@ def structured_output(
     to generate a structured output.
     
     Args:
-        system_prompt (str): The system prompt for the AI model.
-        text (str): The user input text.
-        structured_class (object): The structured class object
-            for the response.
-        model (str): The model identifier for the OpenAI API.
+        messages (list): The list of messages to send to the AI model.
+        structured_class (object): The class defining the structure
+            of the output.
+        model (str): The model identifier for OpenAI's API.
         
     Returns:
         object: The structured_class object with the response
@@ -97,21 +96,27 @@ def openai_request_stream_to_slack(
     Send a request to OpenAI's API to generate a response and stream it to Slack.
 
     Args:
-        model (str): Identifier for the OpenAI model to be used.
-        prompt (str): Input or conversation history for the model.
-        channel_id (str): Slack channel ID where the response will be posted.
-        thread_ts (str): Timestamp of the Slack thread for the response.
-        event_ts (str): Timestamp of the Slack event triggering the function.
-        client (object): Slack client instance for interacting with Slack API.
-        say (callable): Function to send messages to Slack.
-        max_tokens (int, optional): Maximum tokens for the model's response.
-        temperature (float, optional): Sampling temperature for the model.
+        model (str): The model identifier for OpenAI's API.
+        prompt (str): The conversation history or input for the model.
+        instructions (str): Additional instructions for the model.
+        channel_id (str): The ID of the Slack channel to post the
+            response to.
+        thread_ts (str): The timestamp of the Slack thread to post
+            the response to.
+        event_ts (str): The timestamp of the event that triggered
+            the request.
+        client (WebClient): The Slack WebClient object used to
+            interact with the Slack Web API.
+        response_id (str, optional): The ID of the previous response
+            (if any).
+        max_tokens (int, optional): The maximum number of tokens
+            to generate.
+        temperature (float, optional): The temperature for the model.
 
     Returns:
         None
     """
     # Initiate a streamed response from the AI model
-    print(prompt)
     repsonse_stream = aiclient.responses.create(
         model=model,
         input=prompt,
@@ -162,8 +167,8 @@ def openai_request_stream_to_slack(
     else:
         # Create a new thread document with the response ID
         thread_manager.save_thread(
-            channel_id,
             thread_ts,
+            channel_id,
             openai_thread_id=new_response_id,
             done_ts=response_created_at
         )

@@ -131,7 +131,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "You are a capable Slack AI Assistant named @Ai. Your "
                 "role is to summarise information provided by another "
@@ -144,7 +144,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "Whenever summarising content provided by the other "
                 "AI, always include links to the original sources "
@@ -156,14 +156,14 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "Refer to yourself as '@Ai' in all messages. "
                 f"Your Slack ID is <@{bot_id}>."
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "Your goal is to create concise, reliable summaries "
                 "without omitting key information. If multiple links "
@@ -174,7 +174,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "If the summaries or information provided by the "
                 "other AI are unclear, incomplete, or conflicting, "
@@ -184,7 +184,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "Ensure consistency in all your responses and maintain "
                 "professional ethics. Handle personal and sensitive "
@@ -194,7 +194,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "Always provide your responses in the same language "
                 "as the user's query. In case of ambiguous or unclear "
@@ -203,7 +203,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "When responding to follow-up queries or threads, "
                 "make sure to maintain the context of the conversation "
@@ -212,7 +212,7 @@ def summarisation_llm_text_prompts(bot_id: str, current_date,) -> list:
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 f"The current date today is {current_date}"
             )
@@ -286,7 +286,7 @@ def main_llm_query_prompts(
 
     # Return the system and user messages
     return [
-        {"role": "system", "content": system_prompt},
+        {"role": "developer", "content": system_prompt},
         {"role": "user", "content": user_content},
     ]
 
@@ -361,7 +361,7 @@ def error_message_prompt(context: str, e: str) -> list:
     """
     return [
         {
-            "role": "system", "content": (
+            "role": "developer", "content": (
                 f"Use the error message to generate an error message to the user: {context}\n{e}\n"
                 "Remember that the user can't code so just tell them that something went wrong."
                 "Always start with '*Error!*' followed by a newline and a brief description of the error."
@@ -388,11 +388,11 @@ def enhance_query_prompt(
         list: A list of system and user messages to send for query enhancement.
     """
     return [
-        {"role": "system", "content": (
+        {"role": "developer", "content": (
             "YOUR PERSONAL INFORMATION:\n"
             f"* Your personal Slack ID is <@{slack_bot_user_id}>."
         )},
-        {"role": "system", "content": (
+        {"role": "developer", "content": (
             "You are an assistant that improves user queries for summarisation tasks in Slack.\n\n"
             "YOUR GOAL:\n"
             "* Transform vague or incomplete user queries into clear, detailed, and context-rich queries.\n"

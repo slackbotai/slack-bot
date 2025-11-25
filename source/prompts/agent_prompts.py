@@ -58,7 +58,7 @@ def agent_creation_prompt(
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "You are tasked with creating a set of AI analyst "
 				"personas who will each focus on a key theme related "
@@ -109,7 +109,7 @@ def question_prompt(goals: str,) -> list:
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "You are an analyst assigned to delve deep into a "
 				"specific theme as part of a comprehensive report.\n\n"
@@ -163,7 +163,7 @@ def search_instructions_prompt(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You will be provided with a conversation between an "
 				"analyst and an expert, focusing on a specific "
@@ -209,7 +209,7 @@ def answer_instructions_prompt(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You are an expert being interviewed by an analyst "
 				"on a specific theme.\n\n"
@@ -265,7 +265,7 @@ def section_writer_prompt(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You are an expert technical writer assigned to create "
 				"a comprehensive section for a report on a specific "
@@ -324,7 +324,7 @@ def generate_toc_prompt(text_report: str,) -> list:
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"Analyse the following document and create a "
 				"comprehensive Table of Contents (TOC) reflecting "
@@ -368,7 +368,7 @@ def report_writer_prompt(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You are an expert writer specialising in creating "
 				f"{report_type}s. Your task is to generate the body "
@@ -415,7 +415,7 @@ def intro_conclusion_prompt(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You are a technical writer finalizing a report on "
 				f"the topic:\n\n**{topic}**\n\n"
@@ -462,7 +462,7 @@ def agent_analysis_prompt(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You are tasked with analysing a report to ensure "
 				"its accuracy and alignment with provided source "
@@ -544,7 +544,7 @@ def agent_final_prompt(
 		)
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 				"You are tasked with revising a report based on "
 				"detailed analysis feedback. Your goal is to create "
@@ -635,7 +635,7 @@ def prompt_extract_info(
 	"""
 	return [
 		{
-			"role": "system",
+			"role": "developer",
 			"content": (
 			f"""
 			Extract specific information from user-provided text,
@@ -751,7 +751,7 @@ def prompt_to_retrieve_users_choices(
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "The current state of information is as follows: "
 				f"{state}\n\n"

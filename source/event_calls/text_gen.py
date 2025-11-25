@@ -25,7 +25,6 @@ def handle_text_processing(
         thread_ts: str,
         channel_id: str,
         user_id: str,
-        files: list,
 ) -> None:
     """
     Process text-based requests with the chatbot.
@@ -57,18 +56,8 @@ def handle_text_processing(
     response_thread, response_id, done_ts = asyncio.run(
         process_thread(client, channel_id, thread_ts)
     )
-    
-    # _, formatted_messages = threadreader(
-    #     client,
-    #     thread_ts,
-    #     channel_id,
-    #     slack_bot_user_id,
-    #     text_prompt,
-    #     files,
-    #     function_state="chat"
-    # 
 
-    p_thread, thread = filter_and_clean_thread(
+    p_thread, _ = filter_and_clean_thread(
         thread=response_thread,
         done_ts=done_ts,
         until_ts=event_ts,

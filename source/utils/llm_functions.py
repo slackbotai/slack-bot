@@ -49,37 +49,12 @@ from pydantic import BaseModel
 
 from utils.openai_utils import structured_output
 from prompts.structured_output_prompts import (
-    generate_image_request_prompt,
     suggest_search_term_prompt,
     extract_new_info_prompt,
     interpret_summary_bool_prompt,
     time_range_prompt,
     update_info_prompt
 )
-
-class FunctionResponse(BaseModel):
-    """
-    Classify the user's input based on their needs into predefined
-    categories.
-
-    Args:
-        content (str): The user's input message.
-    """
-    function: Literal['llm-chat']
-
-
-class ImageGenerationRequest(BaseModel):
-    """
-    Represent a request for image generation with specific parameters.
-
-    Args:
-        ratio (Literal["1792x1024", "1024x1024", "1024x1792"]):
-            The aspect ratio for the image (wide, square, or narrow).
-        prompt (str): A description of the image to be generated.
-    """
-    ratio: Literal["1792x1024", "1024x1024", "1024x1792"]
-    prompt: str
-
 
 class ExtractInfo(BaseModel):
     """
@@ -175,25 +150,6 @@ class UpdateInfo(BaseModel):
     """
     field: Optional[str]= None
     update_text: Optional[str] = None
-
-
-def generate_image_request(text: str,) -> tuple[str, str]:
-    """
-    Generate a structured request for image generation
-    based on user input.
-
-    Args:
-        text (str): The user's input message related to image
-            generation.
-
-    Returns:
-        tuple (str, str): A tuple where the first element is the
-            image aspect ratio, and the second element is a
-            description of the image to be generated.
-    """
-    system_prompt = generate_image_request_prompt(text)
-    response = structured_output(system_prompt, ImageGenerationRequest)
-    return response.ratio, response.prompt
 
 
 def suggest_search_term(text: str,) -> tuple[str, str]:

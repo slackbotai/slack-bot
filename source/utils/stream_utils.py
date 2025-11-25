@@ -135,7 +135,6 @@ def update_chat_stream(
         if chunk.type == "response.created":
             response_id = chunk.response.id
             response_created_time = chunk.response.created_at
-            print(chunk)
 
         if chunk.type == "response.image_generation_call.partial_image":
             image_base64 = chunk.partial_image_b64

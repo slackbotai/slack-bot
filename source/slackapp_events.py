@@ -182,7 +182,6 @@ def message(
                     thread_ts,
                     channel_id,
                     user_id,
-                    files
                 )
 
 

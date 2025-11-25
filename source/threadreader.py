@@ -31,7 +31,7 @@ import aiohttp
 import base64
 import asyncio
 from datareader import datareader
-from envbase import slack_bot_token, slack_bot_user_id, thread_manager, aiclient
+from envbase import slack_bot_token, slack_bot_user_id, thread_manager
 from utils.web_reader import process_urls_async
 from utils.slack_utils import get_member_name
 from utils.logging_utils import log_error, log_message
@@ -294,7 +294,6 @@ def threadreader(
         channel_id: str,
         bot_user_id: str,
         sys_prompts: list = None,
-        files: list = None,
         function_state:str = None,
         browse_mode:bool = False,
         search_term: str = None,
@@ -492,7 +491,6 @@ def preprocess_user_input(user_input: str, files: list) -> tuple:
     if files:
         for file in files:
             mimetype = (file.get("mimetype") or "").lower()
-            print(file)
             file_info.append({
                 "file_name": file.get("name"),
                 "file_url": file.get("url_private"),
@@ -560,41 +558,26 @@ async def files_to_openai_content(files: list[dict], session) -> list[dict]:
                     "image_url": f"data:{mt};base64,{b64}",
                 })
 
-            # else:
-            #     virtual_file = io.BytesIO(blob)
-            #     file = aiclient.files.create(
-            #         file=(f.get("file_name"), virtual_file, mt),
-            #         purpose="user_data",
-            #         expires_after={
-            #             "anchor": "created_at",
-            #             "seconds": 60*60*24*30
-            #         }
-            #     )
-            #     blocks.append({
-            #         "type": "input_file",
-            #         "file_id": file.id,
-            #     })
-                
-
-            # elif mt == "application/pdf":
-            #     b64 = base64.b64encode(blob).decode("utf-8")
-            #     filename = f.get("file_name") or "document.pdf"
-            #     blocks.append({
-            #         "type": "input_file",
-            #         "filename": filename,
-            #         "file_data": f"data:application/pdf;base64,{b64}",
-            #     })
+            elif mt == "application/pdf":
+                b64 = base64.b64encode(blob).decode("utf-8")
+                filename = f.get("file_name") or "document.pdf"
+                blocks.append({
+                    "type": "input_file",
+                    "filename": filename,
+                    "file_data": f"data:application/pdf;base64,{b64}",
+                })
             
             else:
                 data_type, file_text = await datareader(
                     blob,
                     file_type=f.get("file_type"),
                 )
+                safe_filename = f.get('file_name', 'unknown').replace("'", "").replace('"', "")
+                
                 blocks.append({
                     "type": "input_text",
-                    "text": f"<file> {f.get('file_name')}\n{file_text} </file>",
+                    "text": f"<file_attachment name='{safe_filename}'>\n{file_text}\n</file_attachment>",
                 })
-
 
         except Exception as e:
             log_message(f"Error processing file {url}: {e}", "error")

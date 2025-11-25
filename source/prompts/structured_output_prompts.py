@@ -42,7 +42,7 @@ def generate_image_request_prompt(text: str) -> list:
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 """
                 You are a helpful AI assistant specialised in
@@ -83,7 +83,7 @@ def suggest_search_term_prompt(current_date: str, text: str) -> list:
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 f"""
                 You are an intelligent assistant capable of creating
@@ -122,7 +122,7 @@ def extract_new_info_prompt(text: str) -> list:
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 """
                 You are an AI assistant tasked with extracting new
@@ -235,7 +235,7 @@ def time_range_prompt(
 
     messages = [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "You are a concise assistant that extracts time ranges "
                 "from natural language queries in various languages. "
@@ -246,7 +246,7 @@ def time_range_prompt(
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "Use the current date as a point of reference: "
                 f"'{current_date}'. If a year is not explicitly "
@@ -256,7 +256,7 @@ def time_range_prompt(
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 "If the query requests information or summarisation "
                 "based on the start of the channel history, "
@@ -269,7 +269,7 @@ def time_range_prompt(
             )
         },
         {
-            "role": "system",
+            "role": "developer",
             "content": "Here are some examples:",
         },
         {
@@ -353,7 +353,7 @@ def update_info_prompt(fields: dict, text: str) -> list:
     """
     return [
         {
-            "role": "system",
+            "role": "developer",
             "content": (
                 f"""
                 You are an AI assistant tasked with extracting new

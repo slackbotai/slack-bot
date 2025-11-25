@@ -177,7 +177,6 @@ def say_collections_time_ranges(
     Returns:
         None
     """
-    print("Time Ranges:", time_ranges)
 
     # If there are multiple time ranges in the time_ranges dict and
     # they have the same start and end time

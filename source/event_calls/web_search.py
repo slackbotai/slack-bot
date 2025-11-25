@@ -22,8 +22,6 @@ import requests
 from envbase import serper_api_key
 from threadreader import threadreader
 from utils.llm_functions import suggest_search_term
-from prompts.prompts import summarisation_llm_text_prompts
-from utils.openai_utils import openai_request_stream_to_slack
 from utils.logging_utils import log_message
 
 def perform_web_search(

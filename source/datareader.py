@@ -35,118 +35,20 @@ Attributes:
     slack_web_client (WebClient): The Slack WebClient instance.
 """
 
-import re
-import base64
-import asyncio
-import tempfile
-from io import BytesIO
-
+import logging
+import pandas as pd
 import docx
-import requests
-import pandas as pd # pylint: disable=import-error
-from PIL import Image # pylint: disable=import-error
-from tiktoken import encoding_for_model
-from pdfminer.high_level import extract_text # pylint: disable=import-error
-from pillow_heif import register_heif_opener # pylint: disable=import-error
+from pptx import Presentation
+from io import BytesIO
+from pillow_heif import register_heif_opener
 
-from prompts.prompts import gemini_pdf_summary
-from utils.gemini_utils import gemini_request
-from utils.message_utils import post_ephemeral_message_ok
-from utils.logging_utils import log_error
+from utils.logging_utils import log_error, log_message
 from envbase import (
     thread_storage,
     url_storage,
-    aiclient,
-    slack_web_client,
 )
 
 register_heif_opener()
-
-async def datareader(
-        response: object,
-        file_type: str,
-) -> tuple[str, str]:
-    """
-    Read data from a URL and process it based on the file type.
-
-    This function reads data from a URL, processes it based on the file
-    type, and returns the processed text along with the data type.
-
-    Args:
-        response (object): The HTTP response object containing the file.
-        file_type (str): The type of the file (extension).
-    
-    Returns:
-        tuple[str, str]: A tuple containing the data type and the
-            processed text.
-    """
-    # Default data type if none is matched
-    data_type = ""
-    text = ""
-
-    # Define file type mapping
-    file_type_mapping = {
-        "image": ["jpg", "jpeg", "png", "gif",
-                  "bmp", "tiff", "tif", "webp", "heif"],
-        "audio": ["m4a", "mp3", "wav"],
-        "text": ["c", "cpp", "java", "py", "txt", "html", "css", "js",
-                 "json", "xml", "yaml", "yml", "sh", "bat", "quip"],
-        "docx": ["docx"],
-        "pdf": ["pdf"],
-        "excel": ["xls", "xlsx", "xlsm", "xlsb", "odf", "csv"],
-    }
-
-    # Determine the data type
-    for type_key, extensions in file_type_mapping.items():
-        if file_type in extensions:
-            data_type = type_key
-            break
-
-    text = await process_file_type(
-        response, data_type, file_type,
-    )
-
-    return data_type, text
-
-
-async def process_file_type(
-        response: object,
-        data_type: str,
-        file_type: str,
-) -> str:
-    """
-    This function processes the file based on its type asynchronously
-    and returns the processed text.
-
-    Args:
-        response (object): The HTTP response object containing the file.
-        data_type (str): The type of the file.
-        file_type (str): The extension of the file.
-
-    Returns:
-        str: The processed text from the file.
-    
-    Raises:
-        ValueError: If the file type is not supported.
-    """
-    tasks = []
-
-    if data_type == "audio":
-        tasks.append(handle_audio(response, file_type))
-    elif data_type == "text":
-        tasks.append(response.text())
-    elif data_type == "docx":
-        tasks.append(handle_docx(response, file_type))
-    elif data_type == "excel":
-        tasks.append(handle_excel_and_csv(response, file_type))
-    else:
-        raise ValueError(f"Unsupported file type: {data_type}")
-
-    result = await asyncio.gather(*tasks)
-
-    # In this case, there should be only one result per task,
-    # so return the first result
-    return result[0]
 
 
 def cache_db(
@@ -218,208 +120,152 @@ def cache_db(
         return None
     
 
-async def handle_image(response: object) -> str:
+async def datareader(file_data: bytes, file_type: str) -> tuple[str, str]:
     """
-    Process an image from an HTTP response into a base64 encoded string.
-
-    This function opens the image, standardizes it to JPEG format,
-    and encodes it as a base64 string. The image processing is
-    run in a separate thread to be async-friendly.
-
-    Args:
-        response (object): The HTTP response object containing the image.
-
-    Returns:
-        str: The base64 encoded string of the image, or a message
-             if no image data is found.
-    """
-    if not response.content:
-        return "No image data found."
-
-    def _convert_to_base64(image_bytes: bytes) -> str:
-        """Synchronous helper to perform the image conversion."""
-        # Open the image from raw bytes
-        img = Image.open(BytesIO(image_bytes))
-
-        # Convert the image to RGB to ensure compatibility
-        img = img.convert("RGB")
-
-        # Save the image to a BytesIO object to avoid filesystem I/O
-        img_byte_arr = BytesIO()
-        img.save(img_byte_arr, format="JPEG")
-        img_byte_arr.seek(0)
-
-        # Encode the bytes as a base64 string
-        return base64.b64encode(img_byte_arr.getvalue()).decode("utf-8")
-
-    # Run the synchronous conversion function in a separate thread
-    base64_image = await asyncio.to_thread(_convert_to_base64, response.content)
-    return base64_image
-
-
-async def handle_audio(
-        response: object,
-        file_type: str,
-) -> str:
-    """
-    Process audio data using the OpenAI Whisper API for transcription.
-
-    Args:
-        response (object): The HTTP response object containing
-            the audio.
-        file_type (str): The type of the file (extension).
-
-    Returns:
-        str: The transcription text for the audio.
-    """
-    # Write the bytes to a temporary file
-    with tempfile.NamedTemporaryFile(suffix=f".{file_type}",
-                                     delete=False) as temp_audio:
-        temp_audio.write(response.content)
-        temp_audio_path = temp_audio.name
-
-    # Transcribe the audio file
-    audio_file = open(temp_audio_path, "rb")
-    transcript = aiclient.audio.transcriptions.create(
-                                model="whisper-1", file=audio_file)
-
-    text = "*** THIS IS A TEXT TRANSCRIPTION OF THE AUDIO FILE ***\n\n"
-    text += transcript.text
-    text += "\n\n*** END OF TRANSCRIPTION. ***"
-
-    return text
-
-
-async def handle_docx(
-        response: object,
-        file_type: str,
-) -> str:
-    """
-    Process DOCX files to extract text.
-
-    Args:
-        response (object): The HTTP response object containing
-            the DOCX file.
-        file_type (str): The type of the file (extension).
-
-    Returns:
-        str: The extracted text from the DOCX file.
-    """
-    file_bytes = BytesIO(response.content)
-
-    with tempfile.NamedTemporaryFile(suffix=f".{file_type}",
-                                     delete=False) as temp_docx:
-        temp_docx.write(file_bytes.getbuffer())
-        temp_docx_path = temp_docx.name
-
-    doc = docx.Document(temp_docx_path)
-    return "\n\n".join([p.text for p in doc.paragraphs])
-
-
-async def handle_pdf(
-        response: object,
-        user_input: str,
-        file_type: str,
-        channel_id: str,
-        user_id: str,
-        thread_ts: str,
-) -> str:
-    """
-    Process PDF files to extract text.
-
-    Args:
-        response (object): The HTTP response object containing
-            the PDF file.
-        file_type (str): The type of the file (extension).
-
-    Returns:
-        str: The extracted text from the PDF file.
-    """
-    file_bytes = BytesIO(response.content)
-
-    with tempfile.NamedTemporaryFile(suffix=f".{file_type}",
-                                     delete=False) as temp_pdf:
-        temp_pdf.write(file_bytes.getbuffer())
-        temp_pdf_path = temp_pdf.name
-    text = extract_text(temp_pdf_path)
-    # Clean the text
-    # Replace newlines with spaces
-    text = text.replace("\n", " ")
-    # Replace tabs with spaces
-    text = text.replace("\t", " ")
-    # Remove leading and trailing whitespace
-    text = text.strip()
-    # multiple spaces with a single space
-    text = re.sub(r'\s+', ' ', text)
-    # special characters and punctuation
-    text = re.sub(r'[^\w\s]', '', text)
-    token_count = count_tokens(text)
-    if token_count > 50000:
-        post_ephemeral_message_ok(
-            slack_web_client, channel_id,
-            user_id, thread_ts,
-            (":information_source: The PDF is too large to process "
-             "fully. The summary will prioritise the message "
-             "you provided."),
-        )
-        prompt = gemini_pdf_summary(user_input)
-
-        response = gemini_request(
-            model="gemini-1.5-flash",
-            text=text,
-            prompt=prompt,
-            temperature=0.1,
-        )
-        return response.text
-    return text
-
-
-async def handle_excel_and_csv(
-        response: object,
-        file_type: str,
-) -> str:
-    """
-    Process tabular data files (Excel, CSV) to extract text.
-
-    Args:
-        response (object): The HTTP response object containing
-            the file.
-        file_type (str): The type of the file (extension).
-
-    Returns:
-        str: The extracted text from the file as a string.
-    """
-    with tempfile.NamedTemporaryFile(
-        suffix=f".{file_type}",
-        delete=False) as temp_file:
-        temp_file.write(response.content)
-        temp_file_path = temp_file.name
-
-    # Use the correct pandas reader based on the file extension
-    if file_type == 'csv':
-        df = pd.read_csv(temp_file_path)
-    else:
-        df = pd.read_excel(temp_file_path)
+    Determines how to read the file based on Slack's filetype or extension.
     
-    return df.to_string()
-
-
-def count_tokens(
-        text: str,
-        model: str = "gpt-4.1",
-) -> int:
-    """
-    Count the number of tokens in the given text for
-    the specified model.
-
     Args:
-        text (str): The text to tokenise.
-        model (str): The model name to use for tokenisation
-            (default: gpt-4.1).
-
+        file_data (bytes): The raw file content downloaded from Slack.
+        file_type (str): The 'filetype' field from Slack (e.g., 'text', 'python', 'docx').
+    
     Returns:
-        int: The number of tokens in the text.
+        tuple[str, str]: (The detected category, The extracted text content)
     """
-    # Select encoding based on model
-    encoding = encoding_for_model(model)
-    return len(encoding.encode(text))
+    ft = (file_type or "").lower().replace(".", "")
+    
+    code_and_text = [
+        "text", "txt", "md", "markdown", "log", "rst", "adoc", 
+        "diff", "patch", "properties",
+        "json", "xml", "yaml", "yml", "toml", "ini", "env",
+        "python", "py", 
+        "javascript", "js", "typescript", "ts", "jsx", "tsx",
+        "java", "jar", "class", "kotlin", "kt", "scala",
+        "c", "cpp", "c++", "cc", "h", "hpp", "csharp", "cs",
+        "go", "golang", "rust", "rs", "ruby", "rb", "php",
+        "swift", "r", "perl", "pl", "lua", "clojure", "groovy",
+        "shell", "sh", "bash", "zsh", "fish", "bat", "cmd", "ps1", "powershell",
+        "sql", "dockerfile", "makefile", "gradle", "pom", 
+        "html", "htm", "css", "scss", "sass", "less",
+    ]
+    
+    spreadsheet = ["xlsx", "xls", "xlsm", "odf", "csv", "tsv"]
+    
+    document = ["docx", "doc", "rtf"] 
+    
+    presentation = ["pptx", "ppt"]
+    
+    extracted_text = ""
+    category = "text"
+
+    try:
+        if ft in code_and_text:
+            category = "text"
+            extracted_text = await handle_plain_text(file_data, ft)
+        
+        elif ft in document:
+            category = "docx"
+            extracted_text = await handle_docx(file_data)
+        
+        elif ft in spreadsheet:
+            category = "spreadsheet"
+            extracted_text = await handle_spreadsheet(file_data, ft)
+        
+        elif ft in presentation:
+            category = "pptx"
+            extracted_text = await handle_pptx(file_data)
+            
+        else:
+            # Fallback: If Slack sends a weird type (e.g., 'erlang'),
+            # we assume it's text and try to read it anyway.
+            category = "unknown_text"
+            extracted_text = await handle_plain_text(file_data, ft)
+
+    except Exception as e:
+        log_message(f"Error processing file type {ft}: {e}")
+        extracted_text = f"Error: Could not process file of type {ft}."
+
+    return category, extracted_text
+
+
+async def handle_plain_text(file_data: bytes, file_type: str) -> str:
+    """
+    Decodes raw bytes into string. Handles encoding issues (UTF-8 vs Latin-1).
+    """
+    try:
+        # Try standard UTF-8 first (Most modern files)
+        return file_data.decode('utf-8')
+    except UnicodeDecodeError:
+        try:
+            # Try Latin-1 (Common fallback for older Windows files, logs, or CSVs)
+            return file_data.decode('latin-1')
+        except Exception:
+            return f"[Error: Could not decode text file of type {file_type}. It might be binary data.]"
+
+
+async def handle_spreadsheet(file_data: bytes, file_type: str) -> str:
+    """
+    Reads Excel or CSV bytes and returns a markdown-compatible string representation.
+    """
+    source = BytesIO(file_data)
+    
+    try:
+        # Check if it looks like a CSV or an Excel file
+        if file_type in ['csv', 'tsv', 'txt', 'text']:
+            # For CSV, we can try pandas, but sometimes it fails on bad formatting.
+            try:
+                df = pd.read_csv(source)
+            except:
+                # Fallback: Just read it as raw text if pandas fails on a CSV
+                return await handle_plain_text(file_data, file_type)
+        else:
+            # Excel files
+            df = pd.read_excel(source)
+        
+        # Convert DataFrame to a clean string table (index=False hides row numbers)
+        return df.to_string(index=False)
+        
+    except Exception as e:
+        return f"[Error reading spreadsheet: {str(e)}]"
+
+
+async def handle_docx(file_data: bytes) -> str:
+    """
+    Extracts text from a .docx file using BytesIO.
+    """
+    try:
+        source = BytesIO(file_data)
+        doc = docx.Document(source)
+        
+        full_text = []
+        for para in doc.paragraphs:
+            if para.text.strip(): # Only add non-empty paragraphs
+                full_text.append(para.text)
+                
+        return "\n\n".join(full_text)
+    except Exception as e:
+        return f"[Error reading DOCX: {str(e)}]"
+
+
+async def handle_pptx(file_data: bytes) -> str:
+    """
+    Extracts text from a .pptx file using BytesIO.
+    """
+    try:
+        source = BytesIO(file_data)
+        prs = Presentation(source)
+        
+        text_runs = []
+        
+        for slide in prs.slides:
+            slide_text = []
+            for shape in slide.shapes:
+                if hasattr(shape, "text") and shape.text.strip():
+                    slide_text.append(shape.text)
+            
+            # Group text by slide
+            if slide_text:
+                text_runs.append("\n".join(slide_text))
+                    
+        return "\n\n---\n\n".join(text_runs) # Separator between slides
+    except Exception as e:
+        return f"[Error reading PPTX: {str(e)}]"
