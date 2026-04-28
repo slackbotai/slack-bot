@@ -1,5 +1,6 @@
 services:
   slack_bot:
+    restart: unless-stopped
     build:
       context: . # Build context is the current directory
       dockerfile: Dockerfile
@@ -24,6 +25,7 @@ services:
   mongo:
     image: mongodb/mongodb-community-server:7.0.0-rc10-ubi8
     container_name: mongodb
+    restart: unless-stopped
     ports:
       - "27017:27017"  # Expose MongoDB port 27017
     volumes:
