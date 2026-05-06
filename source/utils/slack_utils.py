@@ -47,7 +47,7 @@ import time
 from http.client import IncompleteRead
 from slack_sdk.errors import SlackApiError
 from utils.logging_utils import log_error, log_message
-from envbase import slackapp
+from envbase import bootstrap_slack_client
 
 # Global event for rate-limiting
 rate_limited_event = asyncio.Event()
@@ -123,10 +123,7 @@ async def get_conversations_history_async(
             if oldest:
                 params["oldest"] = oldest
 
-            # Call Slack API asynchronously
-            response = await asyncio.to_thread(
-                client.conversations_history, timeout=timeout, **params
-            )
+            response = await client.conversations_history(**params)
 
             if not response["ok"]:
                 raise SlackApiError("API response not OK", response=response)
@@ -148,7 +145,7 @@ async def get_conversations_history_async(
             log_error(e, "Slack API Error.")
             log_message(f"Retrying in {5} seconds...", "info")
             retries += 1
-            time.sleep(5) # Wait before retrying
+            await asyncio.sleep(5) # Wait before retrying
 
     raise RuntimeError(
         "Failed to retrieve conversation history after max retries."
@@ -193,8 +190,7 @@ async def get_thread_messages_async(
             if rate_limited_event.is_set():
                 await rate_limited_event.wait()
 
-            response = await asyncio.to_thread(
-                client.conversations_replies,
+            response = await client.conversations_replies(
                 channel=channel_id,
                 ts=thread_ts,
                 limit=limit
@@ -211,7 +207,7 @@ async def get_thread_messages_async(
             # Reduce the batch size but ensure it's at least 10
             limit = max(10, limit // 2)  # Reduce batch size for retries
             retries += 1
-            time.sleep(5) # Pause before retrying
+            await asyncio.sleep(5) # Pause before retrying
             # Swap asyncio.sleep with handle_rate_limit to get error out
             await asyncio.sleep(exponential_backoff(retries))
 
@@ -221,7 +217,7 @@ async def get_thread_messages_async(
                 "Slack API Error. Retrying in 5 seconds...",
                 "warning"
             )
-            time.sleep(5)
+            await asyncio.sleep(5)
             retries += 1
             error_message = e.response.get("error", "Unknown error")
             if error_message == "ratelimited":
@@ -272,7 +268,7 @@ async def get_thread_ts_list_from_slack_async(
         return []
   
 
-def send_message_with_retry(
+async def send_message_with_retry_async(
         client: object,
         channel_id: str,
         thread_ts: str,
@@ -303,7 +299,7 @@ def send_message_with_retry(
 
     while attempt < max_retries:
         try:
-            response = client.chat_postMessage(
+            response = await client.chat_postMessage(
                 channel=channel_id,
                 thread_ts=thread_ts,
                 text=text
@@ -314,7 +310,7 @@ def send_message_with_retry(
             log_error(e, f"{log_context}: Attempt {attempt} failed.")
             if attempt < max_retries:
                 log_message(f"{log_context}: Retrying in {retry_delay} seconds...", level="warning")
-                time.sleep(retry_delay)
+                await asyncio.sleep(retry_delay)
             else:
                 log_message(f"{log_context}: All {max_retries} attempts failed.", level="error")
                 raise  # Rethrow the exception after all retries fail
@@ -334,7 +330,7 @@ def populate_members() -> list:
 
     while max_retries > 0:
         try:
-            result = slackapp.client.users_list()
+            result = bootstrap_slack_client.users_list()
 
             if result and "members" in result.data:
                 members.extend(result.data["members"])
@@ -344,7 +340,7 @@ def populate_members() -> list:
                     cursor = result.data["response_metadata"]["next_cursor"]
                     if not cursor:
                         break
-                    result = slackapp.client.users_list(cursor=cursor)
+                    result = bootstrap_slack_client.users_list(cursor=cursor)
                     if result and "members" in result.data:
                         members.extend(result.data["members"])
                         log_message(f"Page {count} fetched.", "info")
@@ -407,7 +403,7 @@ def get_member_name(user_id: str) -> str:
             return member.get("real_name", "Unknown User")
 
     return None
-def get_channel_name(client: object, channel_id: str) -> str:
+async def get_channel_name_async(client: object, channel_id: str) -> str:
     """
     Retrieves the name of a Slack channel by its ID.
 
@@ -430,7 +426,7 @@ def get_channel_name(client: object, channel_id: str) -> str:
         )
 
     try:
-        response = client.conversations_info(channel=channel_id)
+        response = await client.conversations_info(channel=channel_id)
         return response["channel"]["name"]
 
     except SlackApiError:
@@ -446,6 +442,20 @@ def get_channel_name(client: object, channel_id: str) -> str:
             "error"
         )
         raise
+
+
+def send_message_with_retry(*args, **kwargs):
+    """
+    Synchronous wrapper for legacy agentic workflow code.
+    """
+    return asyncio.run(send_message_with_retry_async(*args, **kwargs))
+
+
+def get_channel_name(*args, **kwargs):
+    """
+    Synchronous wrapper for get_channel_name_async.
+    """
+    return asyncio.run(get_channel_name_async(*args, **kwargs))
 
 
 # Synchronous Wrappers

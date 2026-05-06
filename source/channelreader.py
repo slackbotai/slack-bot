@@ -43,7 +43,7 @@ Raises:
 """
 
 # Standard library imports
-import time
+import os
 import asyncio
 from math import ceil
 from collections import OrderedDict
@@ -51,10 +51,12 @@ from collections import OrderedDict
 # Third-party library imports
 import schedule
 from slack_sdk.errors import SlackApiError
+from slack_sdk.web.async_client import AsyncWebClient
 
 # Application-specific imports
 from envbase import (
-    slack_web_client,
+    slack_bot_token,
+    ssl_context,
     mongodb,
     summarisation,
     channels
@@ -66,13 +68,13 @@ from utils.mongodb_utils import (
     update_existing_threads
 )
 from utils.slack_utils import (
-    get_conversations_history,
-    get_thread_messages,
-    get_channel_name
+    get_conversations_history_async,
+    get_thread_messages_async,
+    get_channel_name_async
 )
 from utils.logging_utils import log_error, log_message
 
-def channelreader(client: object, channel_id: str) -> None:
+async def channelreader(client: object, channel_id: str) -> None:
     """
     Fetches, processes, and stores messages from a specified
     Slack channel.
@@ -97,10 +99,10 @@ def channelreader(client: object, channel_id: str) -> None:
         SlackApiError: If there are issues fetching data from Slack.
     """
     # Adding idle to let bolt app fully start up before running this.
-    time.sleep(5)
+    await asyncio.sleep(5)
 
     # Retrieve the name of the Slack channel
-    channel_name = get_channel_name(client, channel_id)
+    channel_name = await get_channel_name_async(client, channel_id)
     log_message(
         f"Indexing channel: {channel_name} ({channel_id})",
         'info'
@@ -122,7 +124,7 @@ def channelreader(client: object, channel_id: str) -> None:
 
     # Fetch messages in batches using Slack's pagination
     while True:
-        result = get_conversations_history(
+        result = await get_conversations_history_async(
             client, channel_id, cursor, oldest=oldest_ts, limit=100
         )
         # Extract messages from the result
@@ -168,16 +170,16 @@ def channelreader(client: object, channel_id: str) -> None:
         all_messages = process_messages(
             all_messages, client, channel_id, channel_name
         )
-        all_messages = append_thread_messages_batched(
+        all_messages = await append_thread_messages_batched_async(
             all_messages, client, channel_id, channel_name
         )
         save_messages_to_mongodb(all_messages, channel_id, channel_name)
 
     # Clean up missing root and thread messages in MongoDB
-    cleanup_missing_messages(channel_id, channel_name, client)
+    await cleanup_missing_messages(channel_id, channel_name, client)
 
     # Update threads with new replies for recent root messages
-    update_existing_threads(client, channel_id)
+    await update_existing_threads(client, channel_id)
 
     # Log the completion of the indexing process
     log_message(
@@ -238,11 +240,6 @@ def process_messages(
 
     # Remove user ID from final output
     remove_specified_keys(all_messages, ["user"])
-
-    # Append thread messages
-    all_messages = append_thread_messages_batched(
-        all_messages, client, channel_id, channel_name
-    )
 
     return all_messages
 
@@ -488,8 +485,8 @@ async def fetch_thread_messages(
             - A list of thread messages as dictionaries.
     """
     try:
-        thread_messages = await asyncio.to_thread(
-            get_thread_messages, client, channel_id, thread_ts
+        thread_messages = await get_thread_messages_async(
+            client, channel_id, thread_ts
         )
         # Process fetched thread messages
         thread_messages.data["messages"].pop(0)  # Remove duplicate
@@ -536,7 +533,7 @@ async def fetch_thread_messages(
         return thread_ts, []
 
 
-def fetch_and_save_slack_data() -> None:
+async def fetch_and_save_slack_data(client: object) -> None:
     """
     Fetches messages from all Slack channels and saves them to MongoDB.
 
@@ -546,7 +543,7 @@ def fetch_and_save_slack_data() -> None:
         3. Process and store each channel's messages.
         4. Mark completed channels to avoid repetition.
     """
-    channel_ids = fetch_all_channel_ids(slack_web_client)
+    channel_ids = await fetch_all_channel_ids_async(client)
     parsing_done = []
 
     while True:
@@ -558,7 +555,7 @@ def fetch_and_save_slack_data() -> None:
                     f"Channel: {channel_name} | {index}/{len(channel_ids)}",
                     'info'
                 )
-                channelreader(slack_web_client, channel_id)
+                await channelreader(client, channel_id)
                 parsing_done.append(channel_id)
                 log_message(
                     f"Channel finished: {channel_name}",
@@ -575,7 +572,7 @@ def fetch_and_save_slack_data() -> None:
             break
 
         # Optional: Add a delay to prevent busy waiting
-        time.sleep(1)
+        await asyncio.sleep(1)
 
 
 def fetch_all_channel_ids(client: object) -> list[tuple[str, str]]:
@@ -715,8 +712,7 @@ async def fetch_channel_page(client: object, cursor=None) -> dict:
     """
     while True:
         try:
-            response = await asyncio.to_thread(
-                client.conversations_list,
+            response = await client.conversations_list(
                 types="public_channel,private_channel",
                 cursor=cursor,
                 limit=100,
@@ -825,7 +821,7 @@ def save_channel_info_to_mongodb(
         log_error(e, "Error saving channel information to MongoDB.")
 
 
-def run_fetch_and_save_slack_data() -> None:
+async def run_fetch_and_save_slack_data_async() -> None:
     """
     Runs the Slack data fetching process immediately and schedules
     daily updates.
@@ -835,13 +831,49 @@ def run_fetch_and_save_slack_data() -> None:
         2. Schedule the function to run daily at midnight.
         3. Keep the scheduler running indefinitely.
     """
+    scheduler_slack_client = AsyncWebClient(
+        token=slack_bot_token,
+        ssl=ssl_context,
+        timeout=30,
+    )
+    indexing_lock = asyncio.Lock()
+
+    async def run_indexing_once() -> None:
+        if indexing_lock.locked():
+            log_message(
+                "Skipping scheduled indexing because a previous run is active.",
+                "warning",
+            )
+            return
+
+        async with indexing_lock:
+            await fetch_and_save_slack_data(scheduler_slack_client)
+
+    def handle_scheduled_task_result(task: asyncio.Task) -> None:
+        try:
+            task.result()
+        except Exception as e:
+            log_error(e, "Scheduled Slack indexing task crashed.")
+            os._exit(1)
+
+    def schedule_indexing_task() -> None:
+        task = asyncio.create_task(run_indexing_once())
+        task.add_done_callback(handle_scheduled_task_result)
+
     # NOTE Run immediately on program start (Remove later)
-    fetch_and_save_slack_data()
+    await run_indexing_once()
 
     # Schedule the task to run daily at midnight
-    schedule.every().day.at("00:00").do(fetch_and_save_slack_data)
+    schedule.every().day.at("00:00").do(schedule_indexing_task)
 
     # Keep the scheduler running
     while True:
         schedule.run_pending()
-        time.sleep(1)
+        await asyncio.sleep(1)
+
+
+def run_fetch_and_save_slack_data() -> None:
+    """
+    Synchronous entry point for the scheduler thread.
+    """
+    asyncio.run(run_fetch_and_save_slack_data_async())

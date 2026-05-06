@@ -21,10 +21,12 @@ Attributes:
     openai_api_key: The API key for the OpenAI API.
 """
 
-from langchain_openai import OpenAIEmbeddings
-from slack_sdk import WebClient
+import asyncio
 
-from envbase import aiclient, openai_api_key, thread_manager
+from langchain_openai import OpenAIEmbeddings
+from slack_sdk.web.async_client import AsyncWebClient
+
+from envbase import aiclient, async_aiclient, openai_api_key, thread_manager
 from utils.stream_utils import update_chat_stream
 from utils.message_utils import remove_reaction
 
@@ -80,14 +82,14 @@ def structured_output(
     return response
 
 
-def openai_request_stream_to_slack(
+async def openai_request_stream_to_slack(
         model: str,
         prompt: str,
         instructions: str,
         channel_id: str,
         thread_ts: str,
         event_ts: str,
-        client: WebClient,
+        client: AsyncWebClient,
         response_id: str = None,
         max_tokens: int = None,
         temperature: float = None,
@@ -105,7 +107,7 @@ def openai_request_stream_to_slack(
             the response to.
         event_ts (str): The timestamp of the event that triggered
             the request.
-        client (WebClient): The Slack WebClient object used to
+        client (AsyncWebClient): The Slack WebClient object used to
             interact with the Slack Web API.
         response_id (str, optional): The ID of the previous response
             (if any).
@@ -117,7 +119,7 @@ def openai_request_stream_to_slack(
         None
     """
     # Initiate a streamed response from the AI model
-    repsonse_stream = aiclient.responses.create(
+    repsonse_stream = await async_aiclient.responses.create(
         model=model,
         input=prompt,
         instructions=instructions,
@@ -133,14 +135,14 @@ def openai_request_stream_to_slack(
         truncation="auto",
     )
     # Send an initial message to notify the user of an incoming response
-    response = client.chat_postMessage(
+    response = await client.chat_postMessage(
         channel=channel_id,
         thread_ts=thread_ts,
         text="*_Thinking :loading:_*"
     )
 
     # Process and update the message stream
-    new_response_id, response_created_at = update_chat_stream(
+    new_response_id, response_created_at = await update_chat_stream(
         client,
         channel_id,
         thread_ts,
@@ -150,7 +152,7 @@ def openai_request_stream_to_slack(
     )
 
     # Remove the hourglass reaction after processing is done
-    remove_reaction(
+    await remove_reaction(
         client,
         channel_id,
         event_ts,
@@ -159,18 +161,20 @@ def openai_request_stream_to_slack(
 
     if response_id:
         # Save the new response ID for future reference
-        thread_manager.update_thread_metadata(
+        await asyncio.to_thread(
+            thread_manager.update_thread_metadata,
             thread_ts,
             channel_id,
-            {"openai_thread_id": new_response_id, "done_ts": response_created_at}
+            {"openai_thread_id": new_response_id, "done_ts": response_created_at},
         )
     else:
         # Create a new thread document with the response ID
-        thread_manager.save_thread(
+        await asyncio.to_thread(
+            thread_manager.save_thread,
             thread_ts,
             channel_id,
-            openai_thread_id=new_response_id,
-            done_ts=response_created_at
+            new_response_id,
+            response_created_at,
         )
 
 

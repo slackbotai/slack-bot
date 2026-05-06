@@ -14,6 +14,7 @@ Functions:
 from datetime import datetime
 import logging
 import time
+import asyncio
 import traceback
 import pytz
 
@@ -143,7 +144,7 @@ def log_message(message: str, level: str = "info"):
     else:
         logger.info(message)
 
-def error_handler(
+async def error_handler(
     e: object,
     client: object,
     channel_id: str,
@@ -174,43 +175,52 @@ def error_handler(
     Returns:
         None
     """
-    time.sleep(sleep_time)
-    log_error(e, context)
+    await asyncio.sleep(sleep_time)
+    await asyncio.to_thread(log_error, e, context)
 
-    try:
-        remove_reaction(
-            client,
-            channel_id,
-            event_ts,
-            "hourglass_flowing_sand"
-        )
-    except Exception as reaction_error:
-        log_error(reaction_error, "Failed to remove reaction")
+    if client and channel_id and event_ts:
+        try:
+            await remove_reaction(
+                client,
+                channel_id,
+                event_ts,
+                "hourglass_flowing_sand"
+            )
+        except Exception as reaction_error:
+            await asyncio.to_thread(
+                log_error, reaction_error, "Failed to remove reaction"
+            )
 
-    try:
-        add_reaction(
-            client,
-            channel_id,
-            event_ts,
-            "x"
-        )
-    except Exception as reaction_error:
-        log_error(reaction_error, "Failed to add reaction")
+        try:
+            await add_reaction(
+                client,
+                channel_id,
+                event_ts,
+                "x"
+            )
+        except Exception as reaction_error:
+            await asyncio.to_thread(
+                log_error, reaction_error, "Failed to add reaction"
+            )
 
     try:
         prompt = error_message_prompt(context, e)
 
-        completion = openai_request(
+        completion = await asyncio.to_thread(
+            openai_request,
             model="gpt-4.1-mini",
-            prompt=prompt
+            prompt=prompt,
         )
-        say(
-            channel=channel_id,
-            thread_ts=thread_ts,
-            text=f"{completion}"
-        )
+        if say and channel_id:
+            await say(
+                channel=channel_id,
+                thread_ts=thread_ts or event_ts,
+                text=f"{completion}"
+            )
     except Exception as openai_error:
-        log_error(
-            openai_error, "Error during OpenAI request or sending message"
+        await asyncio.to_thread(
+            log_error,
+            openai_error,
+            "Error during OpenAI request or sending message",
         )
     return

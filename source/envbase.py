@@ -51,15 +51,18 @@ Attributes:
 # Standard Library Imports
 import os
 import ssl
+import time
 
 # Third-Party Imports
 import pytz
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 import google.generativeai as genai
 from dotenv import load_dotenv  # pylint: disable=E0611
-from slack_bolt.app import App
+from slack_bolt.async_app import AsyncApp
 from pymongo import MongoClient
+from pymongo.errors import CollectionInvalid, PyMongoError
 from slack_sdk import WebClient
+from slack_sdk.web.async_client import AsyncWebClient
 from utils.thread_manager import ThreadManager
 
 # Load environment variables
@@ -85,23 +88,92 @@ workspace_subdomain = os.getenv("WORKSPACE_SUBDOMAIN")
 # Determine if running inside Docker
 is_docker = os.getenv("IS_DOCKER", "false").lower() == "true"
 print(f"Running in Docker: {is_docker}")
-# Use 'mongo' for Docker, 'localhost' for local development
+
 if is_docker:
-    MONGO_URI = "mongodb://host.docker.internal:27017/"
+    # In docker-compose, MongoDB is reachable by the service name "mongo".
+    # Allow env overrides, but do not fall back to host.docker.internal here:
+    # that points outside the compose network and can make the bot appear stuck.
+    MONGO_URI = (
+        os.getenv("MONGO_URI_DOCKER")
+        or os.getenv("MONGO_URI")
+        or "mongodb://mongo:27017/"
+    )
+elif os.getenv("MONGODB_CLOUD_URI"):
+    MONGO_URI = os.getenv("MONGODB_CLOUD_URI")
+elif os.getenv("MONGO_URI"):
+    MONGO_URI = os.getenv("MONGO_URI")
 else:
-    if os.getenv("MONGODB_CLOUD_URI"):
-        MONGO_URI = os.getenv("MONGODB_CLOUD_URI")
-    else:
-        MONGO_URI = "mongodb://localhost:27017/"
+    MONGO_URI = "mongodb://localhost:27017/"
+
+def create_mongo_client(uri: str) -> MongoClient:
+    """
+    Create a MongoDB client and wait briefly for the server to be reachable.
+    """
+    attempts = int(os.getenv("MONGO_CONNECT_RETRIES", "6"))
+    delay = int(os.getenv("MONGO_CONNECT_RETRY_DELAY_SECONDS", "5"))
+    last_error = None
+
+    for attempt in range(1, attempts + 1):
+        client = MongoClient(
+            uri,
+            serverSelectionTimeoutMS=5000,
+            connectTimeoutMS=5000,
+            socketTimeoutMS=30000,
+        )
+        try:
+            print(
+                f"Connecting to MongoDB at: {uri} "
+                f"(attempt {attempt}/{attempts})"
+            )
+            client.admin.command("ping")
+            return client
+        except PyMongoError as e:
+            last_error = e
+            print(f"MongoDB connection failed: {e}")
+            client.close()
+            if attempt < attempts:
+                time.sleep(delay)
+
+    raise last_error
+
+
+def ensure_logging_collection() -> None:
+    """
+    Create the logging collection if possible.
+
+    If MongoDB is temporarily unavailable later, logging_utils already falls
+    back to console output.
+    """
+    try:
+        if "Logging" not in informationdb.list_collection_names():
+            informationdb.create_collection(
+                "Logging",
+                timeseries={
+                    "timeField": "timestamp",
+                    "granularity": "seconds",
+                },
+                expireAfterSeconds=3600 * 24 * 7
+            )
+            print("Time series collection 'Logging' created with TTL index.")
+    except CollectionInvalid:
+        pass
+    except PyMongoError as e:
+        print(f"Could not prepare MongoDB logging collection: {e}")
+
 
 # Initialise clients and databases
 
-slack_web_client = WebClient(token=slack_bot_token, ssl=ssl_context)
-slackapp = App(token=slack_bot_token)
+slack_web_client = AsyncWebClient(
+    token=slack_bot_token,
+    ssl=ssl_context,
+    timeout=30,
+)
+slackapp = AsyncApp(client=slack_web_client)
 aiclient = OpenAI(api_key=openai_api_key)
+async_aiclient = AsyncOpenAI(api_key=openai_api_key)
 genai.configure(api_key=gemini_api_key)
 gemclient = genai
-mongo_client = MongoClient(MONGO_URI)
+mongo_client = create_mongo_client(MONGO_URI)
 
 # Channels DB
 mongodb = mongo_client["Channels"]
@@ -121,19 +193,8 @@ thread_manager = ThreadManager(
     threads
 )
 
-# Create the time series collection (if it doesn't exist)
-if "Logging" not in informationdb.list_collection_names():
-    informationdb.create_collection(
-        "Logging",
-        timeseries={
-            "timeField": "timestamp",
-            "granularity": "seconds",
-        },
-        expireAfterSeconds=3600 * 24 * 7  # Expire docs after 7 days
-    )
-    print("Time series collection 'Logging' created with TTL index.")
-
 logging = informationdb["Logging"]
+ensure_logging_collection()
 
 # Summarisation Openai models
 BATCH_MODEL = "gpt-4.1-mini"
@@ -142,8 +203,12 @@ SUMMARY_MODEL = "gpt-4.1"
 # Timezone
 timezone = pytz.timezone("Europe/Stockholm") # Change as needed
 
-# Slack team domain
-slack_team_domain = slackapp.client.team_info().data["team"]["domain"]
-
-# Slack bot user ID
-slack_bot_user_id = slackapp.client.auth_test()["user_id"]
+# Slack team domain and bot user ID are bootstrap metadata used across modules.
+# Runtime Slack API calls use AsyncWebClient/AsyncApp above.
+bootstrap_slack_client = WebClient(
+    token=slack_bot_token,
+    ssl=ssl_context,
+    timeout=30,
+)
+slack_team_domain = bootstrap_slack_client.team_info().data["team"]["domain"]
+slack_bot_user_id = bootstrap_slack_client.auth_test()["user_id"]

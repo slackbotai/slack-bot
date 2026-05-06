@@ -27,7 +27,7 @@ import base64
 import tiktoken
 import tempfile
 
-from slack_sdk import WebClient
+from slack_sdk.web.async_client import AsyncWebClient
 from md2slack import SlackMarkdown
 
 styler = SlackMarkdown()
@@ -106,8 +106,8 @@ def safe_split(
     return chunks
 
 
-def update_chat_stream(
-        client: WebClient,
+async def update_chat_stream(
+        client: AsyncWebClient,
         channel_id: str,
         thread_ts: str,
         completion: list,
@@ -131,7 +131,9 @@ def update_chat_stream(
     """
     slack_msg_limit = 3500  # Slack message character limit == 4000
 
-    for count, chunk in enumerate(completion):
+    count = 0
+    async for chunk in completion:
+        count += 1
         if chunk.type == "response.created":
             response_id = chunk.response.id
             response_created_time = chunk.response.created_at
@@ -140,7 +142,7 @@ def update_chat_stream(
             image_base64 = chunk.partial_image_b64
             image_bytes = base64.b64decode(image_base64)
 
-            client.files_upload_v2(
+            await client.files_upload_v2(
                 channel=channel_id,
                 thread_ts=thread_ts,
                 content=image_bytes,
@@ -156,7 +158,7 @@ def update_chat_stream(
 
             fix_aistream = aistream[:split_point]
 
-            client.chat_update(
+            await client.chat_update(
                 channel=channel_id,
                 ts=response["ts"],
                 text=f"{styler(fix_aistream)}"
@@ -168,7 +170,7 @@ def update_chat_stream(
             # it in smaller chunks
             if len(aistream) > 0:
                 # Post a new message to continue the conversation
-                response = client.chat_postMessage(
+                response = await client.chat_postMessage(
                     channel=channel_id,
                     thread_ts=response["ts"],
                     text="response..."
@@ -177,7 +179,7 @@ def update_chat_stream(
         # Update the chat every 15 chunks
         if aistream and count % 15 == 0:
             if len(aistream_placeholder) < slack_msg_limit:
-                client.chat_update(
+                await client.chat_update(
                     channel=channel_id,
                     ts=response["ts"],
                     text=f"{styler(aistream)}"
@@ -190,12 +192,12 @@ def update_chat_stream(
     # Check if the message exceeds Slack's character limit
     if len(aistream_placeholder) < slack_msg_limit:
         if aistream == "":
-            client.chat_delete(
+            await client.chat_delete(
                 channel=channel_id,
                 ts=response["ts"],
             )
         else:
-            client.chat_update(
+            await client.chat_update(
                 channel=channel_id,
                 ts=response["ts"],
                 text=f"{styler(aistream)}"

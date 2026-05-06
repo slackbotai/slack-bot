@@ -37,7 +37,7 @@ from utils.slack_utils import get_member_name
 from utils.logging_utils import log_error, log_message
 
 
-def fetch_replies(
+async def fetch_replies_async(
         client: object,
         thread_ts: str,
         channel_id: str,
@@ -53,7 +53,18 @@ def fetch_replies(
     Returns:
         object: The data object containing all messages in the thread.
     """
-    return client.conversations_replies(channel=channel_id, ts=thread_ts)
+    return await client.conversations_replies(channel=channel_id, ts=thread_ts)
+
+
+def fetch_replies(
+        client: object,
+        thread_ts: str,
+        channel_id: str,
+) -> object:
+    """
+    Synchronous wrapper retained for legacy report/web-search helpers.
+    """
+    return asyncio.run(fetch_replies_async(client, thread_ts, channel_id))
 
 
 def build_user_dict(
@@ -372,9 +383,10 @@ async def process_thread(
         A tuple containing (agent_thread, response_thread).
     """
     # Get the timestamp of the last message we've already processed. Default to "0" for the first run.
-    thread_stamps = thread_manager.get_thread(
+    thread_stamps = await asyncio.to_thread(
+        thread_manager.get_thread,
         thread_ts,
-        channel_id
+        channel_id,
     )
 
     response_id = thread_stamps.get("openai_thread_id") if thread_stamps else None
@@ -452,7 +464,7 @@ async def thread_reader(
     """
     try:
         # Use retry wrapper for rate limiting & errors
-        thread = client.conversations_replies(
+        thread = await client.conversations_replies(
             channel=channel_id,
             ts=thread_ts,
             oldest=done_ts

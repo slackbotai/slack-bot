@@ -18,7 +18,7 @@ Attributes:
     None
 """
 
-import time
+import asyncio
 from datetime import datetime
 
 import tiktoken
@@ -27,7 +27,7 @@ from slack_sdk.errors import SlackApiError
 from utils.message_utils import post_ephemeral_message_ok
 from utils.logging_utils import log_message
 
-def channel_member_verification(
+async def channel_member_verification(
         tagged_channel_ids: list,
         user_id: str,
         client: object
@@ -57,7 +57,7 @@ def channel_member_verification(
             all_members = []
             cursor = None
             while True:
-                response = client.conversations_members(
+                response = await client.conversations_members(
                     channel=tagged_channel_id, cursor=cursor
                 )
                 members = response.get('members', [])
@@ -76,7 +76,7 @@ def channel_member_verification(
                 if not cursor:
                     break
 
-                time.sleep(1) # To avoid rate limiting
+                await asyncio.sleep(1) # To avoid rate limiting
                 log_message(
                     f"Members in channel {tagged_channel_id}: {all_members}",
                     "debug"
@@ -154,7 +154,7 @@ def tagged_collections(
                 )
 
 
-def say_collections_time_ranges(
+async def say_collections_time_ranges(
         time_ranges: dict,
         client: object,
         channel_id: str,
@@ -185,7 +185,7 @@ def say_collections_time_ranges(
         start_date = datetime.fromtimestamp(start_timestamp).strftime('%Y-%m-%d')
         end_date = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
 
-        say(
+        await say(
             channel=channel_id,
             thread_ts=event_ts,
             text=f"Time Range: [{start_date} - {end_date}] for all tagged channels"
@@ -197,9 +197,10 @@ def say_collections_time_ranges(
             end_date = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
 
             # Find the respective channel name for collection_name
-            channel_name = client.conversations_info(channel=collection_name)["channel"]["name"]
+            response = await client.conversations_info(channel=collection_name)
+            channel_name = response["channel"]["name"]
 
-            say(
+            await say(
                 channel=channel_id,
                 thread_ts=event_ts,
                 text=f"Time Range: [{start_date} - {end_date}] for {channel_name}"
@@ -207,7 +208,7 @@ def say_collections_time_ranges(
     # If there are multiple time ranges in the time_ranges dict and
     # they have different start and end times
     else:
-        post_ephemeral_message_ok(
+        await post_ephemeral_message_ok(
             client=client,
             channel_id=channel_id,
             user_id=user_id,
@@ -227,16 +228,17 @@ def say_collections_time_ranges(
             end_date = datetime.fromtimestamp(end_timestamp).strftime('%Y-%m-%d')
 
             # Find the respective channel name for collection_name
-            channel_name = client.conversations_info(channel=collection_name)["channel"]["name"]
+            response = await client.conversations_info(channel=collection_name)
+            channel_name = response["channel"]["name"]
 
-            say(
+            await say(
                 channel=channel_id,
                 thread_ts=event_ts,
                 text=f"Time Range: [{start_date} - {end_date}] for {channel_name}"
             )
 
 
-def get_model_batch_size(est_tokens: int,
+async def get_model_batch_size(est_tokens: int,
                          client: object,
                          channel_id: str,
                          user_id: str,
@@ -263,7 +265,7 @@ def get_model_batch_size(est_tokens: int,
         batch_size = 450
     elif est_tokens < 800000:
         batch_size = 650
-        post_ephemeral_message_ok(
+        await post_ephemeral_message_ok(
             client=client,
             channel_id=channel_id,
             user_id=user_id,
@@ -278,7 +280,7 @@ def get_model_batch_size(est_tokens: int,
         )
     elif est_tokens > 800000:
         batch_size = 1200
-        post_ephemeral_message_ok(
+        await post_ephemeral_message_ok(
             client=client,
             channel_id=channel_id,
             user_id=user_id,
@@ -293,7 +295,7 @@ def get_model_batch_size(est_tokens: int,
         )
     else:
         batch_size = 2000
-        post_ephemeral_message_ok(
+        await post_ephemeral_message_ok(
             client=client,
             channel_id=channel_id,
             user_id=user_id,

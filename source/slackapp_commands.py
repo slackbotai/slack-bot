@@ -36,12 +36,9 @@ Attributes:
 """
 
 import datetime
+import asyncio
 
 from utils.logging_utils import log_message
-from utils.logging_utils import error_handler
-from agentic_workflow.workflow import report_agentic_workflow
-from agentic_workflow.threads_data import enter_agentic_workflow
-from agentic_workflow.input_agents import wait_for_feedback_periodically
 from envbase import (
     slackapp,
     timezone,
@@ -52,7 +49,7 @@ from envbase import (
 )
 
 @slackapp.command("/ai-bug-report")
-def bug_report(
+async def bug_report(
         ack: callable,
         body: dict,
         client: object,
@@ -71,11 +68,11 @@ def bug_report(
     Returns:
         None
     """
-    ack()
+    await ack()
 
     # If a text is not provided, send a message to the user
     if not body.get("text", "").strip():
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text="Please provide a bug report."
         )
@@ -97,17 +94,17 @@ def bug_report(
     }
 
     # Insert the bug report into the collection
-    bug_reports.insert_one(bug_report_data)
+    await asyncio.to_thread(bug_reports.insert_one, bug_report_data)
 
     # Send a response back to the user's private messages
-    client.chat_postMessage(
+    await client.chat_postMessage(
         channel=body["user_id"],
         text=f"Bug report added: {text}"
     )
 
 
 @slackapp.command("/ai-feature-request")
-def feature_request(
+async def feature_request(
         ack: callable,
         body: dict,
         client: object,
@@ -126,7 +123,7 @@ def feature_request(
     Returns:
         None
     """
-    ack()
+    await ack()
 
     # Current time (YYYY-MM-DD-HH:MM:SS) in the timezone
     current_time = datetime.datetime.now(timezone).strftime(
@@ -134,7 +131,7 @@ def feature_request(
 
     # If a text is not provided, send a message to the user
     if not body.get("text", "").strip():
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text="Please provide a feature request."
         )
@@ -152,17 +149,17 @@ def feature_request(
     }
 
     # Insert the bug report into the collection
-    feature_requests.insert_one(feature_request_data)
+    await asyncio.to_thread(feature_requests.insert_one, feature_request_data)
 
     # Send a response back to the user's private messages
-    client.chat_postMessage(
+    await client.chat_postMessage(
         channel=body["user_id"],
         text=f"Feature request added: {text}"
     )
 
 
 @slackapp.command("/ai-search-enable")
-def search_enable(
+async def search_enable(
         ack: callable,
         body: dict,
         client: object,
@@ -186,25 +183,25 @@ def search_enable(
         Exception: Raised in case of errors while
             updating the collection.
     """
-    ack()
+    await ack()
 
     # Current time (YYYY-MM-DD-HH:MM:SS) in the timezone
     current_time = datetime.datetime.now(timezone).strftime(
         "%Y-%m-%d %H:%M:%S")
 
     # Get public channels
-    response_public = client.conversations_list(types="public_channel")
+    response_public = await client.conversations_list(types="public_channel")
     public_channels = {channel["id"] for channel in response_public.get(
         "channels", [])}
 
     # Get private channels
-    response_private = client.conversations_list(types="private_channel")
+    response_private = await client.conversations_list(types="private_channel")
     private_channels = {channel["id"] for channel in response_private.get(
         "channels", [])}
 
     # If the channel is a public_channel, reject the command
     if body["channel_id"] in public_channels:
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text="Public channels are always summarised"
         )
@@ -213,7 +210,7 @@ def search_enable(
     # If the channel is not a private_channel, reject the command
     # (Most likely a direct message or group chat)
     elif body["channel_id"] not in private_channels:
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text="Direct messages and group chats are always ignored."
         )
@@ -221,10 +218,12 @@ def search_enable(
 
     try:
         # Check if the channel is already allowed for summarisation
-        existing_channel = summarisation.find_one(
-            {"channel_id": body["channel_id"]})
+        existing_channel = await asyncio.to_thread(
+            summarisation.find_one,
+            {"channel_id": body["channel_id"]}
+        )
         if existing_channel:
-            client.chat_postMessage(
+            await client.chat_postMessage(
                 channel=body["user_id"],
                 text="This channel is already allowed for summarisation."
             )
@@ -238,14 +237,14 @@ def search_enable(
             "user_name": body["user_name"],
             "timestamp": current_time
         }
-        summarisation.insert_one(summarisation_data)
+        await asyncio.to_thread(summarisation.insert_one, summarisation_data)
 
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text="Channel will now be allowed for summarisation."
         )
     except Exception as e:
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text=("An error occurred while updating the "
                   f"summarisation collection: {str(e)}")
@@ -253,7 +252,7 @@ def search_enable(
 
 
 @slackapp.command("/ai-search-disable")
-def search_disable(
+async def search_disable(
         ack: callable,
         body: dict,
         client: object,
@@ -276,28 +275,32 @@ def search_disable(
         Exception: Raised in case of errors while
             updating the collection.
     """
-    ack()
+    await ack()
 
     try:
         # Check if the channel is already disallowed for summarisation
-        existing_channel = summarisation.find_one(
-            {"channel_id": body["channel_id"]})
+        existing_channel = await asyncio.to_thread(
+            summarisation.find_one,
+            {"channel_id": body["channel_id"]}
+        )
         if not existing_channel:
-            client.chat_postMessage(
+            await client.chat_postMessage(
                 channel=body["user_id"],
                 text="This channel is already disallowed for summarisation."
             )
             return
 
         # Remove the channel from the "summarisation" collection
-        summarisation.delete_one({"channel_id": body["channel_id"]})
+        await asyncio.to_thread(
+            summarisation.delete_one, {"channel_id": body["channel_id"]}
+        )
 
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text="Channel will no longer be allowed for summarisation."
         )
     except Exception as e:
-        client.chat_postMessage(
+        await client.chat_postMessage(
             channel=body["user_id"],
             text=("An error occurred while updating the "
                   f"summarisation collection: {str(e)}")
@@ -305,7 +308,7 @@ def search_disable(
 
 
 @slackapp.action("create_report")
-def create_report(
+async def create_report(
         ack: callable,
         body: dict,
         client: object,
@@ -316,7 +319,7 @@ def create_report(
     This function now only returns a deprecation message.
     """
     try:
-        ack()
+        await ack()
     except Exception:
         return
 
@@ -325,7 +328,7 @@ def create_report(
         
         channel_id = body.get('container', {}).get('channel_id')
 
-        client.chat_postEphemeral(
+        await client.chat_postEphemeral(
             channel=channel_id,
             user=user_id,
             text=":warning: **Feature Deprecated:** The 'Create Report' workflow is no longer available via this button."

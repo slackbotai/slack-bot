@@ -32,6 +32,7 @@ Attributes:
 # Standard library imports
 from datetime import datetime, timedelta
 import time
+import asyncio
 from concurrent.futures import ThreadPoolExecutor
 
 # Third-party library imports
@@ -42,9 +43,9 @@ from envbase import mongodb
 from utils.openai_utils import generate_embedding_batch, generate_embedding
 from utils.slack_utils import (
     get_member_name,
-    get_conversations_history,
-    get_thread_ts_list_from_slack,
-    get_thread_messages,
+    get_conversations_history_async,
+    get_thread_ts_list_from_slack_async,
+    get_thread_messages_async,
 )
 from utils.logging_utils import log_message
 
@@ -475,7 +476,7 @@ def execute_bulk_operations(
         )
 
 
-def update_existing_threads(
+async def update_existing_threads(
         client: object,
         channel_id: str,
         days_ago: int = 3,
@@ -514,7 +515,7 @@ def update_existing_threads(
             continue
 
         # Fetch the latest replies for the thread
-        thread_messages = get_thread_messages(client, channel_id, root_ts)
+        thread_messages = await get_thread_messages_async(client, channel_id, root_ts)
         if not thread_messages or "messages" not in thread_messages.data:
             continue
 
@@ -547,9 +548,10 @@ def update_existing_threads(
                         f"(UserID: <@{msg['user']}>): {msg['text']}"
                     ),
                     "embedding": (
-                        generate_embedding(
-                            msg["text"]
-                        ) if "text" in msg else None
+                            await asyncio.to_thread(
+                                generate_embedding, msg["text"]
+                            )
+                            if "text" in msg else None
                     )
                 }
                 new_thread_messages.append(processed_message)
@@ -568,7 +570,7 @@ def update_existing_threads(
             )
 
 
-def cleanup_missing_messages(
+async def cleanup_missing_messages(
         channel_id: str,
         channel_name: str,
         client: object,
@@ -611,7 +613,9 @@ def cleanup_missing_messages(
 
     # Step 1: Fetch root messages from Slack that are within the
     # cutoff date
-    fetched_root_messages = get_conversations_history(client, channel_id)
+    fetched_root_messages = await get_conversations_history_async(
+        client, channel_id
+    )
     fetched_root_ts_list = [
         msg["ts"] for msg in fetched_root_messages.data.get("messages", [])
         if float(msg["ts"]) >= cutoff_timestamp
@@ -693,7 +697,7 @@ def cleanup_missing_messages(
 
         # Fetch thread message timestamps from Slack for the current
         # root message
-        slack_thread_ts_list = get_thread_ts_list_from_slack(
+        slack_thread_ts_list = await get_thread_ts_list_from_slack_async(
             root_ts, channel_id, client
         )
 

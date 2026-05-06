@@ -38,7 +38,7 @@ from md2slack import SlackMarkdown
 
 # Local application imports
 from envbase import (
-    aiclient, slack_bot_user_id, mongodb, BATCH_MODEL, SUMMARY_MODEL,
+    async_aiclient, slack_bot_user_id, mongodb, BATCH_MODEL, SUMMARY_MODEL,
     workspace_subdomain,
 )
 from prompts.prompts import main_llm_query_prompts
@@ -56,7 +56,7 @@ MODEL = "gpt-4.1-mini"
 FINAL_MODEL = "gpt-4.1"
 
 
-def handle_summarise_request(
+async def handle_summarise_request(
         client: object,
         query: str,
         event_ts: str,
@@ -79,18 +79,20 @@ def handle_summarise_request(
     Returns:
         None
     """
-    log_message(
+    await asyncio.to_thread(
+        log_message,
         "Summarisation Activated",
-        "info"
+        "info",
     )
     # Regular expression to extract channel ID from a Slack link
     slack_channel_id_pattern = r"<#([A-Za-z0-9]+)\|>"
 
     # Extract the channel ID
     tagged_channel_ids = re.findall(slack_channel_id_pattern, query)
-    log_message(
+    await asyncio.to_thread(
+        log_message,
         f"Channel IDs: {tagged_channel_ids}",
-        "info"
+        "info",
     )
 
     if not tagged_channel_ids:
@@ -100,11 +102,12 @@ def handle_summarise_request(
         # (Should not be able to get here but just in case)
 
     # Check if the user is a member of the tagged channel(s)
-    channel_member_verification(
+    await channel_member_verification(
         tagged_channel_ids, user_id, client
     )
     # Get MongoDB collection ids for each tagged channel
-    collections = tagged_collections(
+    collections = await asyncio.to_thread(
+        tagged_collections,
         tagged_channel_ids, mongodb, channel_id,
         event_ts, client, user_id
     )
@@ -136,17 +139,18 @@ def handle_summarise_request(
         # Get the tagged channel ID for the summary
         tagged_channel_id = collection.name
 
-        log_message(
+        await asyncio.to_thread(
+            log_message,
             f"Processing channel: {collection.name}",
-            "info"
+            "info",
         )
         # Interpret the time range from the query
-        time_range = interpret_time_range(
+        time_range = await interpret_time_range(
             query,
             collection,
         )
         # Get the start and end timestamps for the query
-        start_timestamp, end_timestamp = get_start_end_dates(
+        start_timestamp, end_timestamp = await get_start_end_dates(
             client, channel_id, user_id,
             event_ts, time_range, sent_messages,
         )
@@ -154,7 +158,8 @@ def handle_summarise_request(
         time_ranges[collection.name] = (start_timestamp, end_timestamp)
 
         # Get relevant messages from MongoDB in batches
-        batch = batching(
+        batch = await asyncio.to_thread(
+            batching,
             start_timestamp,
             end_timestamp,
             collection,
@@ -173,7 +178,7 @@ def handle_summarise_request(
         all_messages.extend(messages)
 
     # Generate the summary and send it back to Slack
-    formatted_summary = get_summary(  # pylint: disable=C0103
+    formatted_summary = await get_summary(  # pylint: disable=C0103
         all_messages,
         query,
         say,
@@ -185,16 +190,16 @@ def handle_summarise_request(
     # --------------------> END OF RAG WORKFLOW <-------------------- #
 
     # After processing all collections, report time ranges
-    say_collections_time_ranges(
+    await say_collections_time_ranges(
         time_ranges, client, channel_id, event_ts, say, user_id,
     )
     # Send the summary back to the Slack thread
-    say(
+    await say(
         channel=channel_id,
         thread_ts=event_ts,
         text=formatted_summary,
     )
-    remove_reaction(
+    await remove_reaction(
         client,
         channel_id,
         event_ts,
@@ -202,7 +207,7 @@ def handle_summarise_request(
     )
 
 
-def interpret_time_range(
+async def interpret_time_range(
         query: str,
         collection: object,
 ) -> dict:
@@ -223,32 +228,35 @@ def interpret_time_range(
     current_date = datetime.now().strftime("%Y-%m-%d")
 
     # First timestamp in the channel history
+    first_doc = await asyncio.to_thread(
+        lambda: list(collection.find().sort("ts", 1).limit(1))[0]
+    )
     start_timestamp = datetime.fromtimestamp(
-        float(
-            list(collection.find().sort("ts", 1).limit(1))[0]["ts"]
-        )
+        float(first_doc["ts"])
     ).timestamp()
 
     # Start date of the channel history
     ch_start_date = datetime.fromtimestamp(
         start_timestamp
     ).strftime("%Y-%m-%d")
-    response = interpret_timerange(
+    response = await asyncio.to_thread(
+        interpret_timerange,
         current_date,
         ch_start_date,
         query,
     )
     # Debug print to verify the raw response format
-    log_message(
+    await asyncio.to_thread(
+        log_message,
         "Raw response from GPT-4: Start Date: "
         f"{response.start_date} | End Date: {response.end_date}",
-        "debug"
+        "debug",
     )
 
     return response
 
 
-def get_start_end_dates(
+async def get_start_end_dates(
         client: object,
         channel_id: str,
         user_id: str,
@@ -311,7 +319,7 @@ def get_start_end_dates(
         # Check if the time range is more than 6 months
         if end_timestamp - start_timestamp > 15778463:
             if channel_id not in sent_messages:
-                post_ephemeral_message_ok(
+                await post_ephemeral_message_ok(
                     client=client,
                     channel_id=channel_id,
                     user_id=user_id,
@@ -549,9 +557,7 @@ async def summarise_batch(
         Exception: If there is an error generating the summary.
     """
     try:
-        # Running the summarisation in a separate thread
-        response = await asyncio.to_thread(
-            aiclient.chat.completions.create,
+        response = await async_aiclient.chat.completions.create(
             model=model,
             messages=main_llm_query_prompts(
                 slack_bot_user_id, query, batch, previous_summary,
@@ -601,7 +607,7 @@ async def summarise_in_batches(
         str: The formatted summary text.
     """
     # Get the batch size based on the estimated token count
-    batch_size = get_model_batch_size(
+    batch_size = await get_model_batch_size(
         est_tokens, client, channel_id, user_id, event_ts
     )
 
@@ -704,7 +710,7 @@ async def summarise_in_batches(
         return "Error generating summary."
 
 
-def get_summary(
+async def get_summary(
         all_messages: list,
         query: str,
         say: callable,
@@ -757,7 +763,7 @@ def get_summary(
 
     # Generate the summary using the summarisation models
     try:
-        summary = asyncio.run(summarise_in_batches(
+        summary = await summarise_in_batches(
             query,
             summary_input,
             est_tokens,
@@ -766,7 +772,6 @@ def get_summary(
             user_id,
             event_ts,
             )
-        )
         # Precise Replacement using the mapping:
         for placeholder, (link, _) in message_placeholders.items():
             summary = summary.replace(placeholder, link)
@@ -777,7 +782,7 @@ def get_summary(
     # Handle exceptions and errors
     except Exception as e:
         log_error(e, "Error generating summary")
-        say(
+        await say(
             channel=channel_id,
             text="Sorry, there was an error generating the summary."
         )

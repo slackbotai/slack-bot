@@ -18,26 +18,37 @@ Attributes:
     slack_app_token (str): The Slack app-level token.
 """
 
-import time
+import os
+import asyncio
 import threading
 from http.client import IncompleteRead
 
 from slack_sdk.errors import SlackApiError
-from slack_bolt.adapter.socket_mode import SocketModeHandler
+from slack_bolt.adapter.socket_mode.async_handler import AsyncSocketModeHandler
 
 from envbase import slackapp, slack_app_token
 from channelreader import run_fetch_and_save_slack_data
-from slackapp_events import handle_reaction_added_events, message
-from slackapp_commands import (
-    bug_report,
-    feature_request,
-    search_enable,
-    search_disable,
-    create_report
-)
-from utils.logging_utils import log_message
+# Import modules for their Bolt decorator registrations.
+import slackapp_events
+import slackapp_commands
+from utils.logging_utils import log_error, log_message
 
-def main(retry=3,) -> None:
+
+def run_scheduler_or_exit() -> None:
+    """
+    Run the background Slack indexer and terminate the process on failure.
+
+    Docker only restarts containers when the main process exits. Without
+    this wrapper, the scheduler thread can crash while Socket Mode keeps the
+    process alive, leaving the bot half-running and hard to diagnose.
+    """
+    try:
+        run_fetch_and_save_slack_data()
+    except Exception as e:
+        log_error(e, "Background Slack indexing thread crashed.")
+        os._exit(1)
+
+async def main(retry=3,) -> None:
     """
     Main function to start the Slack app and connect to Slack.
 
@@ -51,17 +62,7 @@ def main(retry=3,) -> None:
         SlackApiError: If there is an error connecting to Slack.
         IncompleteRead: If the connection is incomplete.
     """
-    # Add commands to the Slack app
-    slackapp.command("/ai-bug-report")(bug_report)
-    slackapp.command("/ai-feature-request")(feature_request)
-    slackapp.command("/ai-search-enable")(search_enable)
-    slackapp.command("/ai-search-disable")(search_disable)
-    slackapp.global_shortcut("create_report")(create_report)
-    # Add events to the Slack app
-    slackapp.event("reaction_added")(handle_reaction_added_events)
-    slackapp.message(message)
-
-    scheduler_thread = threading.Thread(target=run_fetch_and_save_slack_data)
+    scheduler_thread = threading.Thread(target=run_scheduler_or_exit)
     # Ensures the thread will exit when the main program exits
     scheduler_thread.daemon = True
     scheduler_thread.start()
@@ -70,8 +71,8 @@ def main(retry=3,) -> None:
     while retry > 0:
         try:
             # Start the Slack App
-            handler = SocketModeHandler(slackapp, slack_app_token)
-            handler.start()
+            handler = AsyncSocketModeHandler(slackapp, slack_app_token)
+            await handler.start_async()
         except (SlackApiError, IncompleteRead):
             retry -= 1
             log_message(
@@ -79,7 +80,7 @@ def main(retry=3,) -> None:
                 f"Retrying... {retry} retries left.",
                 "warning"
             )
-            time.sleep(2)  # Short delay before retrying
+            await asyncio.sleep(2)  # Short delay before retrying
         else:
             # Exit loop if handler starts successfully
             break
@@ -89,4 +90,4 @@ def main(retry=3,) -> None:
             "Failed to connect to Slack after multiple retries.", "critical"
         )
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

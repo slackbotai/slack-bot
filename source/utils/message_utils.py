@@ -67,7 +67,7 @@ def extract_event_data(event: dict,) -> dict:
     }
 
 
-def is_direct_message(
+async def is_direct_message(
         client: object,
         user_input: str,
         user_id: str,
@@ -97,9 +97,8 @@ def is_direct_message(
             return False
 
         # Check if the message is from a DM or if it mentions the bot
-        im_channel_id = client.conversations_open(
-            users=[user_id]
-            )["channel"]["id"]
+        response = await client.conversations_open(users=user_id)
+        im_channel_id = response["channel"]["id"]
         enable_dm_mode = channel_id == im_channel_id
         mentions_bot = user_input.startswith(f"<@{slack_bot_user_id}>")
         return bool(user_input) and (mentions_bot or enable_dm_mode)
@@ -143,7 +142,7 @@ def preprocess_user_input(
     return cleaned_input, thread_ts, channel_detected
 
 
-def add_reaction(
+async def add_reaction(
         client: object,
         channel_id: str,
         timestamp: str,
@@ -161,14 +160,19 @@ def add_reaction(
     Returns:
         None
     """
-    client.reactions_add(
-        channel=channel_id,
-        timestamp=timestamp,
-        name=reaction_name
-    )
+    try:
+        await client.reactions_add(
+            channel=channel_id,
+            timestamp=timestamp,
+            name=reaction_name
+        )
+    except SlackApiError as e:
+        if e.response.get("error") == "already_reacted":
+            return
+        raise
 
 
-def remove_reaction(
+async def remove_reaction(
         client: object,
         channel_id: str,
         timestamp: str,
@@ -186,14 +190,19 @@ def remove_reaction(
     Returns:
         None
     """
-    client.reactions_remove(
-        channel=channel_id,
-        timestamp=timestamp,
-        name=reaction_name
-    )
+    try:
+        await client.reactions_remove(
+            channel=channel_id,
+            timestamp=timestamp,
+            name=reaction_name
+        )
+    except SlackApiError as e:
+        if e.response.get("error") in {"no_reaction", "not_reacted"}:
+            return
+        raise
 
 
-def post_ephemeral_message_ok(
+async def post_ephemeral_message_ok(
         client:object,
         channel_id:str,
         user_id:str,
@@ -219,7 +228,7 @@ def post_ephemeral_message_ok(
     Returns:
         None
     """
-    client.chat_postEphemeral(
+    await client.chat_postEphemeral(
         channel=channel_id,
         user=user_id,
         thread_ts=thread_ts,

@@ -21,11 +21,17 @@ Attributes:
     styler (Markdown2Slack): An instance of the Markdown to Slack
         converter for formatting messages.
 """
+import asyncio
+import os
 import re
 from envbase import slackapp, slack_bot_user_id
 from event_calls.text_gen import handle_text_processing
 from event_calls.summarisation import handle_summarise_request
-from agentic_workflow.threads_data import active_threads
+from agentic_workflow.threads_data import (
+    active_threads,
+    enter_agentic_workflow,
+    exit_agentic_workflow,
+)
 from utils.llm_functions import interpret_summary_bool
 from utils.logging_utils import error_handler, log_error
 from utils.message_utils import (
@@ -34,11 +40,71 @@ from utils.message_utils import (
     is_direct_message,
     preprocess_user_input,
     add_reaction,
+    remove_reaction,
     post_ephemeral_message_ok
 )
 
+
+REQUEST_TIMEOUT_SECONDS = int(os.getenv("REQUEST_TIMEOUT_SECONDS", "300"))
+
+
+async def notify_thread_busy(
+        client: object,
+        channel_id: str,
+        user_id: str,
+        thread_ts: str,
+) -> None:
+    """
+    Let the user know a previous request in the same thread is still running.
+    """
+    try:
+        await client.chat_postEphemeral(
+            channel=channel_id,
+            user=user_id,
+            thread_ts=thread_ts,
+            text=(
+                "I'm still working on the previous request in this thread. "
+                "Please wait for that response to finish before sending another."
+            ),
+        )
+    except Exception as e:
+        await asyncio.to_thread(
+            log_error,
+            e,
+            "Failed to send busy-thread notice.",
+        )
+
+
+async def notify_request_timeout(
+        client: object,
+        channel_id: str,
+        thread_ts: str,
+        event_ts: str,
+) -> None:
+    """
+    Tell the user their request timed out and clean up the visible status.
+    """
+    try:
+        await client.chat_postMessage(
+            channel=channel_id,
+            thread_ts=thread_ts or event_ts,
+            text=(
+                "This request took too long and was stopped after "
+                f"{REQUEST_TIMEOUT_SECONDS // 60} minutes. "
+                "Please try again with a smaller file, narrower summary range, "
+                "or shorter prompt."
+            ),
+        )
+    except Exception as e:
+        await asyncio.to_thread(
+            log_error,
+            e,
+            "Failed to send request-timeout notice.",
+        )
+
+
 @slackapp.event("reaction_added")
-def handle_reaction_added_events(body: dict,) -> None:
+async def handle_reaction_added_events(body: dict,) -> None:
     """
     Handle delete AI bot messages with the :x: reaction.
 
@@ -55,11 +121,11 @@ def handle_reaction_added_events(body: dict,) -> None:
     reaction = event["reaction"]
 
     if reaction == "x" and event["item_user"] == slack_bot_user_id:
-        slackapp.client.chat_delete(channel=item["channel"], ts=item["ts"])
+        await slackapp.client.chat_delete(channel=item["channel"], ts=item["ts"])
 
 
 @slackapp.action("acknowledge_summary_warning")
-def handle_acknowledge_summary_warning(
+async def handle_acknowledge_summary_warning(
         ack: callable,
         respond: callable,
 ) -> None:
@@ -74,17 +140,17 @@ def handle_acknowledge_summary_warning(
     Returns:
         None
     """
-    ack()
+    await ack()
 
-    respond({
+    await respond({
         "delete_original": True
     })
 
 
 @slackapp.event("message")
 @slackapp.event("file_shared")
-def message(
-    args: dict,
+async def message(
+    event: dict,
     client: object,
     say: callable,
     ack: callable,
@@ -108,11 +174,14 @@ def message(
             handling process.
     """
     error_context = "Error: Message handling"
+    channel_id = None
+    event_ts = None
+    thread_ts = None
+    processing_thread = None
     try:
-        ack()
+        await ack()
 
-        data = args.__dict__
-        event_data = extract_event_data(data.get("event"))
+        event_data = extract_event_data(event)
         user_input = event_data["user_input"]
         event_ts = event_data["event_ts"]
         thread_ts = event_data["thread_ts"]
@@ -120,13 +189,10 @@ def message(
         user_id = event_data["user_id"]
         files = event_data["files"]
 
-        if not is_relevant_message(data.get("event")):
+        if not is_relevant_message(event):
             return
 
-        if active_threads.get(thread_ts):
-            return
-
-        if is_direct_message(client, user_input, user_id, channel_id):
+        if await is_direct_message(client, user_input, user_id, channel_id):
 
             user_input, thread_ts, channel_detected = preprocess_user_input(
                 user_input,
@@ -134,7 +200,19 @@ def message(
                 thread_ts
             )
 
-            add_reaction(
+            if active_threads.get(thread_ts):
+                await notify_thread_busy(
+                    client,
+                    channel_id,
+                    user_id,
+                    thread_ts,
+                )
+                return
+
+            processing_thread = thread_ts
+            enter_agentic_workflow(processing_thread)
+
+            await add_reaction(
                 client,
                 channel_id,
                 event_ts,
@@ -145,10 +223,12 @@ def message(
             if channel_detected:
                 # Interpret if a summary is requested
                 try:
-                    value = interpret_summary_bool(user_input)
+                    value = await asyncio.to_thread(
+                        interpret_summary_bool, user_input
+                    )
 
                     if value is True:
-                        post_ephemeral_message_ok(
+                        await post_ephemeral_message_ok(
                             client=client,
                             channel_id=channel_id,
                             user_id=user_id,
@@ -162,31 +242,77 @@ def message(
                             )
                         )
                 except Exception as e:
-                    log_error(e, context="Error: Interpret summary bool")
+                    await asyncio.to_thread(
+                        log_error,
+                        e,
+                        "Error: Interpret summary bool",
+                    )
 
             if value:
                 error_context = "Error: Summarise request"
-                handle_summarise_request(
-                    client,
-                    user_input,
-                    event_ts,
-                    channel_id,
-                    user_id,
-                    say
+                await asyncio.wait_for(
+                    handle_summarise_request(
+                        client,
+                        user_input,
+                        event_ts,
+                        channel_id,
+                        user_id,
+                        say,
+                    ),
+                    timeout=REQUEST_TIMEOUT_SECONDS,
                 )
             else:
                 error_context = "Error: Text processing"
-                handle_text_processing(
-                    client,
-                    event_ts,
-                    thread_ts,
-                    channel_id,
-                    user_id,
+                await asyncio.wait_for(
+                    handle_text_processing(
+                        client,
+                        event_ts,
+                        thread_ts,
+                        channel_id,
+                        user_id,
+                    ),
+                    timeout=REQUEST_TIMEOUT_SECONDS,
                 )
 
 
-    except Exception as e:
-        error_handler(
-            e, client, channel_id, say, thread_ts,
-            event_ts, context=error_context
+    except asyncio.TimeoutError:
+        await notify_request_timeout(
+            client,
+            channel_id,
+            thread_ts,
+            event_ts,
         )
+        try:
+            await remove_reaction(
+                client,
+                channel_id,
+                event_ts,
+                "hourglass_flowing_sand",
+            )
+            await add_reaction(
+                client,
+                channel_id,
+                event_ts,
+                "x",
+            )
+        except Exception as reaction_error:
+            await asyncio.to_thread(
+                log_error,
+                reaction_error,
+                "Failed to update reactions after request timeout.",
+            )
+    except Exception as e:
+        try:
+            await error_handler(
+                e, client, channel_id, say, thread_ts,
+                event_ts, context=error_context
+            )
+        except Exception as handler_error:
+            await asyncio.to_thread(
+                log_error,
+                handler_error,
+                "Failed while handling a message-processing error.",
+            )
+    finally:
+        if processing_thread:
+            exit_agentic_workflow(processing_thread)

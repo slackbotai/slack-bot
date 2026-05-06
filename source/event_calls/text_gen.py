@@ -19,7 +19,7 @@ from envbase import slack_bot_user_id
 from utils.openai_utils import openai_request_stream_to_slack
 from utils.logging_utils import log_message
 
-def handle_text_processing(
+async def handle_text_processing(
         client: object,
         event_ts: str,
         thread_ts: str,
@@ -51,10 +51,10 @@ def handle_text_processing(
     """
     text_prompt = prompts.main_llm_text_prompts(slack_bot_user_id, user_id)
 
-    log_message("Bot chat response received", "info")
+    await asyncio.to_thread(log_message, "Bot chat response received", "info")
 
-    response_thread, response_id, done_ts = asyncio.run(
-        process_thread(client, channel_id, thread_ts)
+    response_thread, response_id, done_ts = await process_thread(
+        client, channel_id, thread_ts
     )
 
     p_thread, _ = filter_and_clean_thread(
@@ -63,7 +63,7 @@ def handle_text_processing(
         until_ts=event_ts,
     )
 
-    openai_request_stream_to_slack(
+    await openai_request_stream_to_slack(
         model="gpt-5.1",
         prompt=p_thread,
         response_id=response_id,
@@ -73,4 +73,4 @@ def handle_text_processing(
         event_ts=event_ts,
         client=client,
     )
-    log_message("Bot chat response sent", "info")
+    await asyncio.to_thread(log_message, "Bot chat response sent", "info")
