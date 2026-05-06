@@ -52,6 +52,7 @@ Attributes:
 import os
 import ssl
 import time
+from urllib.parse import urlparse
 
 # Third-Party Imports
 import pytz
@@ -137,6 +138,33 @@ def create_mongo_client(uri: str) -> MongoClient:
     raise last_error
 
 
+def create_mongo_client_with_fallbacks(uri: str) -> MongoClient:
+    """
+    Connect to MongoDB, trying a small set of Docker-safe host aliases.
+    """
+    uris = [uri]
+    parsed_uri = urlparse(uri)
+
+    if is_docker and parsed_uri.hostname in {"mongo", "mongodb"}:
+        alternate_host = "mongodb" if parsed_uri.hostname == "mongo" else "mongo"
+        alternate_uri = uri.replace(
+            f"://{parsed_uri.hostname}",
+            f"://{alternate_host}",
+            1,
+        )
+        uris.append(alternate_uri)
+
+    last_error = None
+    for candidate_uri in dict.fromkeys(uris):
+        try:
+            return create_mongo_client(candidate_uri)
+        except PyMongoError as e:
+            last_error = e
+            print(f"MongoDB URI failed: {candidate_uri}")
+
+    raise last_error
+
+
 def ensure_logging_collection() -> None:
     """
     Create the logging collection if possible.
@@ -173,7 +201,7 @@ aiclient = OpenAI(api_key=openai_api_key)
 async_aiclient = AsyncOpenAI(api_key=openai_api_key)
 genai.configure(api_key=gemini_api_key)
 gemclient = genai
-mongo_client = create_mongo_client(MONGO_URI)
+mongo_client = create_mongo_client_with_fallbacks(MONGO_URI)
 
 # Channels DB
 mongodb = mongo_client["Channels"]
