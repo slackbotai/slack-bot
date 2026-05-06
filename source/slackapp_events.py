@@ -148,6 +148,7 @@ async def handle_acknowledge_summary_warning(
 
 
 @slackapp.event("message")
+@slackapp.event("app_mention")
 @slackapp.event("file_shared")
 async def message(
     event: dict,
@@ -192,7 +193,13 @@ async def message(
         if not is_relevant_message(event):
             return
 
-        if await is_direct_message(client, user_input, user_id, channel_id):
+        channel_type = event.get("channel_type")
+        event_type = event.get("type")
+        mentions_bot = f"<@{slack_bot_user_id}>" in user_input
+        if event_type == "message" and channel_type != "im" and not mentions_bot:
+            return
+
+        if await is_direct_message(user_input, user_id, channel_type):
 
             user_input, thread_ts, channel_detected = preprocess_user_input(
                 user_input,

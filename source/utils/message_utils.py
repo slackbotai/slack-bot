@@ -68,43 +68,34 @@ def extract_event_data(event: dict,) -> dict:
 
 
 async def is_direct_message(
-        client: object,
         user_input: str,
         user_id: str,
-        channel_id: str,
+        channel_type: str | None = None,
 ) -> bool:
     """
     Check if the message is a direct message to the bot or
     mentions the bot.
 
     Args:
-        client (object): The Slack client instance.
         user_input (str): The content of the message.
         user_id (str): The Slack user ID of the message sender.
-        channel_id (str): The Slack channel ID where the
-            message was sent.
+        channel_type (str | None): Slack event channel type, such as
+            "im", "channel", "group", or "mpim".
 
     Returns:
         bool: True if the message is a direct message to the
             bot or mentions the bot.
     
-    Raises:
-        Exception: If an error occurs while checking the message.
     """
-    try:
-        # Ignore messages from the bot itself
-        if user_id == slack_bot_user_id:
-            return False
+    # Ignore messages from the bot itself
+    if user_id == slack_bot_user_id:
+        return False
 
-        # Check if the message is from a DM or if it mentions the bot
-        response = await client.conversations_open(users=user_id)
-        im_channel_id = response["channel"]["id"]
-        enable_dm_mode = channel_id == im_channel_id
-        mentions_bot = user_input.startswith(f"<@{slack_bot_user_id}>")
-        return bool(user_input) and (mentions_bot or enable_dm_mode)
-    except SlackApiError as e:
-        if e.response["error"] == "cannot_dm_bot":
-            return False
+    # DMs are identified directly from Slack's event payload. Channel/group
+    # messages only count when they mention the bot.
+    enable_dm_mode = channel_type == "im"
+    mentions_bot = f"<@{slack_bot_user_id}>" in user_input
+    return bool(user_input) and (mentions_bot or enable_dm_mode)
 
 
 def preprocess_user_input(
