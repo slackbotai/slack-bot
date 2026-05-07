@@ -80,7 +80,7 @@ def handle_acknowledge_summary_warning(
         "delete_original": True
     })
 
-
+@slackapp.event("app_mention")
 @slackapp.event("message")
 @slackapp.event("file_shared")
 def message(
@@ -119,6 +119,7 @@ def message(
         channel_id = event_data["channel_id"]
         user_id = event_data["user_id"]
         files = event_data["files"]
+        print(channel_id)
 
         if not is_relevant_message(data.get("event")):
             return
@@ -126,7 +127,7 @@ def message(
         if active_threads.get(thread_ts):
             return
 
-        if is_direct_message(client, user_input, user_id, channel_id):
+        if is_direct_message(user_input, user_id, channel_id):
 
             user_input, thread_ts, channel_detected = preprocess_user_input(
                 user_input,

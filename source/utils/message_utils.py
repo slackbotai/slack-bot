@@ -25,8 +25,6 @@ Attributes:
 
 import re
 
-from slack_sdk.errors import SlackApiError
-
 from envbase import slack_bot_user_id
 
 CHANNEL_PATTERN = re.compile(r"<#([A-Z0-9]+)\|([a-z0-9_åäö\-]*)>")
@@ -68,44 +66,30 @@ def extract_event_data(event: dict,) -> dict:
 
 
 def is_direct_message(
-        client: object,
         user_input: str,
         user_id: str,
         channel_id: str,
 ) -> bool:
     """
-    Check if the message is a direct message to the bot or
-    mentions the bot.
+    Check if the message is a DM to the bot or mentions the bot.
 
     Args:
-        client (object): The Slack client instance.
         user_input (str): The content of the message.
         user_id (str): The Slack user ID of the message sender.
         channel_id (str): The Slack channel ID where the
             message was sent.
 
     Returns:
-        bool: True if the message is a direct message to the
-            bot or mentions the bot.
-    
-    Raises:
-        Exception: If an error occurs while checking the message.
+        bool: True if the message is a DM to the bot or mentions the bot.
     """
-    try:
-        # Ignore messages from the bot itself
-        if user_id == slack_bot_user_id:
-            return False
 
-        # Check if the message is from a DM or if it mentions the bot
-        im_channel_id = client.conversations_open(
-            users=[user_id]
-            )["channel"]["id"]
-        enable_dm_mode = channel_id == im_channel_id
-        mentions_bot = user_input.startswith(f"<@{slack_bot_user_id}>")
-        return bool(user_input) and (mentions_bot or enable_dm_mode)
-    except SlackApiError as e:
-        if e.response["error"] == "cannot_dm_bot":
-            return False
+    # Ignore messages from the bot itself.
+    if user_id == slack_bot_user_id:
+        return False
+
+    mentions_bot = user_input.startswith(f"<@{slack_bot_user_id}>")
+    is_dm = channel_id.startswith("D")
+    return bool(user_input) and (mentions_bot or is_dm)
 
 
 def preprocess_user_input(
