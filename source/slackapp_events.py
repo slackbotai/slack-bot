@@ -188,3 +188,13 @@ def message(
             e, client, channel_id, say, thread_ts,
             event_ts, context=error_context
         )
+
+
+@slackapp.event("file_shared")
+def file_shared(
+    args: dict,
+    client: object,
+    say: callable,
+) -> None:
+    """Handle file_shared events sent by users to the Slack app."""
+    return None
