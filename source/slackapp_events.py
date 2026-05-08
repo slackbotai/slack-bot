@@ -111,15 +111,16 @@ def message(
         ack()
 
         data = args.__dict__
+
+        if not is_relevant_message(data.get("event")):
+            return
+
         event_data = extract_event_data(data.get("event"))
         user_input = event_data["user_input"]
         event_ts = event_data["event_ts"]
         thread_ts = event_data["thread_ts"]
         channel_id = event_data["channel_id"]
         user_id = event_data["user_id"]
-
-        if not is_relevant_message(data.get("event")):
-            return
 
         if active_threads.get(thread_ts):
             return
@@ -195,6 +196,9 @@ def file_shared(
     args: dict,
     client: object,
     say: callable,
+    ack: callable,
 ) -> None:
     """Handle file_shared events sent by users to the Slack app."""
+    ack()
+    data = args.__dict__
     return None

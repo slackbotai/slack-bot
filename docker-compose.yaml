@@ -18,16 +18,12 @@ services:
       - LANGCHAIN_API_KEY=${LANGCHAIN_API_KEY}
       - LANGCHAIN_PROJECT=${LANGCHAIN_PROJECT}
       - WORKSPACE_SUBDOMAIN=${WORKSPACE_SUBDOMAIN}
-    ports:
-      - "5000:5000"  # Expose port 5000 (adjust as needed)
     depends_on:
       - mongo  # Wait for mongo container to be ready
   mongo:
     image: mongodb/mongodb-community-server:7.0.0-rc10-ubi8
     container_name: mongodb
     restart: unless-stopped
-    ports:
-      - "27017:27017"  # Expose MongoDB port 27017
     volumes:
       - mongo_data:/data/db  # Persist MongoDB data
       - ./empty_configdb:/data/configdb  # Bind mount an empty directory to avoid anonymous empty volume creation

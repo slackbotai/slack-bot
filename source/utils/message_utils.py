@@ -39,8 +39,12 @@ def is_relevant_message(event: dict,) -> bool:
     Returns:
         bool: True if the message is relevant, otherwise False.
     """
+
+    if not event.get("user") or not event.get("channel") or not event.get("ts"):
+        return False
     subtype = event.get("subtype")
-    return subtype not in {"bot_message", "message_changed", "message_deleted"}
+    
+    return subtype not in {"bot_message", "message_changed", "message_deleted", "file_share"}
 
 
 def extract_event_data(event: dict,) -> dict:
