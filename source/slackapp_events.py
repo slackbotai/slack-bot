@@ -82,7 +82,6 @@ def handle_acknowledge_summary_warning(
 
 @slackapp.event("app_mention")
 @slackapp.event("message")
-@slackapp.event("file_shared")
 def message(
     args: dict,
     client: object,
@@ -118,8 +117,6 @@ def message(
         thread_ts = event_data["thread_ts"]
         channel_id = event_data["channel_id"]
         user_id = event_data["user_id"]
-        files = event_data["files"]
-        print(channel_id)
 
         if not is_relevant_message(data.get("event")):
             return
